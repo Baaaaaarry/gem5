@@ -1,51 +1,115 @@
-# Copyright (c) 2012, 2017-2018, 2023 Arm Limited
-# All rights reserved.
-#
-# The license below extends only to copyright in the software and shall
-# not be construed as granting a license to any other intellectual
-# property including but not limited to intellectual property relating
-# to a hardware implementation of the functionality of the software
-# licensed hereunder.  You may use the software subject to the license
-# terms below provided that you ensure that this notice is replicated
-# unmodified and in its entirety in all distributions of the software,
-# modified or unmodified, in source code or in binary form.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are
-# met: redistributions of source code must retain the above copyright
-# notice, this list of conditions and the following disclaimer;
-# redistributions in binary form must reproduce the above copyright
-# notice, this list of conditions and the following disclaimer in the
-# documentation and/or other materials provided with the distribution;
-# neither the name of the copyright holders nor the names of its
-# contributors may be used to endorse or promote products derived from
-# this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 from m5.objects import *
 from m5.objects.ArmMMU import ArmMMU
 from m5.proxy import *
 
-from .O3_ARM_v7a import (
-    O3_ARM_v7a_3,
-    O3_ARM_v7a_DCache,
-    O3_ARM_v7a_ICache,
-    O3_ARM_v7aL2,
-)
+
+# Simple ALU Instructions have a latency of 1
+class O3_ARM_Cortex_x3_Simple_Int(FUDesc):
+    opList = [OpDesc(opClass="IntAlu", opLat=1)]
+    count = 4
 
 
-class O3_ARM_Cortex_x3(O3_ARM_v7a_3):
+# Complex ALU instructions have a variable latencies
+class O3_ARM_Cortex_x3_Complex_Int(FUDesc):
+    opList = [
+        OpDesc(opClass="IntMult", opLat=3, pipelined=True),
+        OpDesc(opClass="IntDiv", opLat=12, pipelined=False),
+        OpDesc(opClass="IprAccess", opLat=3, pipelined=True),
+    ]
+    count = 2
+
+
+# Floating point and SIMD instructions
+class O3_ARM_Cortex_x3_FP(FUDesc):
+    opList = [
+        OpDesc(opClass="SimdAdd", opLat=4),
+        OpDesc(opClass="SimdAddAcc", opLat=4),
+        OpDesc(opClass="SimdAlu", opLat=4),
+        OpDesc(opClass="SimdCmp", opLat=4),
+        OpDesc(opClass="SimdCvt", opLat=3),
+        OpDesc(opClass="SimdMisc", opLat=3),
+        OpDesc(opClass="SimdMult", opLat=5),
+        OpDesc(opClass="SimdMultAcc", opLat=5),
+        OpDesc(opClass="SimdMatMultAcc", opLat=5),
+        OpDesc(opClass="SimdShift", opLat=3),
+        OpDesc(opClass="SimdShiftAcc", opLat=3),
+        OpDesc(opClass="SimdSqrt", opLat=9),
+        OpDesc(opClass="SimdFloatAdd", opLat=5),
+        OpDesc(opClass="SimdFloatAlu", opLat=5),
+        OpDesc(opClass="SimdFloatCmp", opLat=3),
+        OpDesc(opClass="SimdFloatCvt", opLat=3),
+        OpDesc(opClass="SimdFloatDiv", opLat=3),
+        OpDesc(opClass="SimdFloatMisc", opLat=3),
+        OpDesc(opClass="SimdFloatMult", opLat=3),
+        OpDesc(opClass="SimdFloatMultAcc", opLat=5),
+        OpDesc(opClass="SimdFloatMatMultAcc", opLat=5),
+        OpDesc(opClass="SimdFloatSqrt", opLat=9),
+        OpDesc(opClass="FloatAdd", opLat=5),
+        OpDesc(opClass="FloatCmp", opLat=5),
+        OpDesc(opClass="FloatCvt", opLat=5),
+        OpDesc(opClass="FloatDiv", opLat=9, pipelined=False),
+        OpDesc(opClass="FloatSqrt", opLat=33, pipelined=False),
+        OpDesc(opClass="FloatMult", opLat=4),
+        OpDesc(opClass="FloatMultAcc", opLat=5),
+        OpDesc(opClass="FloatMisc", opLat=3),
+    ]
+    count = 4
+
+
+# Load/Store Units
+class O3_ARM_Cortex_x3_Load(FUDesc):
+    opList = [
+        OpDesc(opClass="MemRead", opLat=2),
+        OpDesc(opClass="FloatMemRead", opLat=2),
+    ]
+    count = 2
+
+
+class O3_ARM_Cortex_x3_Store(FUDesc):
+    opList = [
+        OpDesc(opClass="MemWrite", opLat=2),
+        OpDesc(opClass="FloatMemWrite", opLat=2),
+    ]
+    count = 3
+
+
+# Functional Units for this CPU
+class O3_ARM_Cortex_x3_FUP(FUPool):
+    FUList = [
+        O3_ARM_Cortex_x3_Simple_Int(),
+        O3_ARM_Cortex_x3_Complex_Int(),
+        O3_ARM_Cortex_x3_Load(),
+        O3_ARM_Cortex_x3_Store(),
+        O3_ARM_Cortex_x3_FP(),
+    ]
+
+
+class O3_ARM_Cortex_x3_BTB(SimpleBTB):
+    numEntries = 4096
+    tagBits = 18
+    associativity = 2
+    instShiftAmt = 2
+    btbReplPolicy = LRURP()
+    btbIndexingPolicy = BTBSetAssociative(
+        num_entries=Parent.numEntries,
+        set_shift=Parent.instShiftAmt,
+        assoc=Parent.associativity,
+        tag_bits=Parent.tagBits,
+    )
+
+
+# Bi-Mode Branch Predictor with enhanced parameters
+class O3_ARM_Cortex_x3_BP(BiModeBP):
+    btb = O3_ARM_Cortex_x3_BTB()
+    ras = ReturnAddrStack(numEntries=32)
+    globalPredictorSize = 16384
+    globalCtrBits = 2
+    choicePredictorSize = 16384
+    choiceCtrBits = 2
+    instShiftAmt = 2
+
+
+class O3_ARM_Cortex_x3(ArmO3CPU):
     LQEntries = 16
     SQEntries = 16
     LSQDepCheckShift = 0
@@ -72,6 +136,7 @@ class O3_ARM_Cortex_x3(O3_ARM_v7a_3):
     dispatchWidth = 8
     issueWidth = 8
     wbWidth = 8
+    fuPool = O3_ARM_Cortex_x3_FUP()
     iewToCommitDelay = 1
     renameToROBDelay = 1
     commitWidth = 8
@@ -86,6 +151,7 @@ class O3_ARM_Cortex_x3(O3_ARM_v7a_3):
     numROBEntries = 320
 
     switched_out = False
+    branchPred = O3_ARM_Cortex_x3_BP()
 
     mmu = ArmMMU(
         l2_shared=ArmTLB(
@@ -98,7 +164,8 @@ class O3_ARM_Cortex_x3(O3_ARM_v7a_3):
     )
 
 
-class O3_ARM_Cortex_x3_ICache(O3_ARM_v7a_ICache):
+# Instruction Cache
+class O3_ARM_Cortex_x3_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
@@ -112,7 +179,7 @@ class O3_ARM_Cortex_x3_ICache(O3_ARM_v7a_ICache):
 
 
 # Data Cache
-class O3_ARM_Cortex_x3_DCache(O3_ARM_v7a_DCache):
+class O3_ARM_Cortex_x3_DCache(Cache):
     tag_latency = 2
     data_latency = 2
     response_latency = 2
@@ -126,7 +193,7 @@ class O3_ARM_Cortex_x3_DCache(O3_ARM_v7a_DCache):
 
 
 # L2 Cache
-class O3_ARM_Cortex_x3L2(O3_ARM_v7aL2):
+class O3_ARM_Cortex_x3L2(Cache):
     tag_latency = 12
     data_latency = 12
     response_latency = 12
