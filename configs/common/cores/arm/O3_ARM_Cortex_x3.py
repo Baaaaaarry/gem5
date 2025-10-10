@@ -194,9 +194,9 @@ class O3_ARM_Cortex_x3_DCache(Cache):
 
 # L2 Cache
 class O3_ARM_Cortex_x3L2(Cache):
-    tag_latency = 12
-    data_latency = 12
-    response_latency = 12
+    tag_latency = 6
+    data_latency = 6
+    response_latency = 6
     mshrs = 16
     tgts_per_mshr = 8
     size = "1MiB"
@@ -207,3 +207,13 @@ class O3_ARM_Cortex_x3L2(Cache):
     prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = RandomRP()
+
+class O3_ARM_Cortex_x3_L3(Cache):
+    size = "8MiB"
+    assoc = 16
+    tag_latency = 12
+    data_latency = 12
+    response_latency = 12
+    mshrs = 20
+    tgts_per_mshr = 12
+    clusivity = "mostly_excl"

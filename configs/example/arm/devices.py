@@ -346,12 +346,16 @@ class ClusterSystem:
 
     def __init__(self, **kwargs):
         self._clusters = []
+        self._l3_type = None
 
     def numCpuClusters(self):
         return len(self._clusters)
 
     def addCpuCluster(self, cpu_cluster):
         self._clusters.append(cpu_cluster)
+
+    def setL3Type(self, l3_type):
+        self._l3_type = l3_type
 
     def addCaches(self, need_caches, last_cache_level):
         if not need_caches:
@@ -371,7 +375,10 @@ class ClusterSystem:
             max_clock_cluster = max(
                 self._clusters, key=lambda c: c.clk_domain.clock[0]
             )
-            self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
+            if self._l3_type is not None:
+                self.l3 = self._l3_type(clk_domain=max_clock_cluster.clk_domain)
+            else:
+                self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
             self.toL3Bus = L2XBar(width=64)
             self.toL3Bus.mem_side_ports = self.l3.cpu_side
             self.l3.mem_side = self.membus.cpu_side_ports
@@ -380,35 +387,6 @@ class ClusterSystem:
         # connect each cluster to the memory hierarchy
         for cluster in self._clusters:
             cluster.connectMemSide(cluster_mem_bus)
-
-    def addCaches_l3size(self, need_caches, last_cache_level, l3_size):
-        if not need_caches:
-            # connect each cluster to the memory hierarchy
-            for cluster in self._clusters:
-                cluster.connectMemSide(self.membus)
-            return
-
-        cluster_mem_bus = self.membus
-        assert last_cache_level >= 1 and last_cache_level <= 3
-        for cluster in self._clusters:
-            cluster.addL1()
-        if last_cache_level > 1:
-            for cluster in self._clusters:
-                cluster.addL2(cluster.clk_domain)
-        if last_cache_level > 2:
-            max_clock_cluster = max(
-                self._clusters, key=lambda c: c.clk_domain.clock[0]
-            )
-            self.l3 = L3(clk_domain=max_clock_cluster.clk_domain, size=l3_size)
-            self.toL3Bus = L2XBar(width=64)
-            self.toL3Bus.mem_side_ports = self.l3.cpu_side
-            self.l3.mem_side = self.membus.cpu_side_ports
-            cluster_mem_bus = self.toL3Bus
-
-        # connect each cluster to the memory hierarchy
-        for cluster in self._clusters:
-            cluster.connectMemSide(cluster_mem_bus)
-
 
 class SimpleSeSystem(System, ClusterSystem):
     """
