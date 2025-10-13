@@ -22,28 +22,6 @@ class O3_ARM_Cortex_x2_Complex_Int(FUDesc):
 # Floating point and SIMD instructions
 class O3_ARM_Cortex_x2_FP(FUDesc):
     opList = [
-        OpDesc(opClass="SimdAdd", opLat=4),
-        OpDesc(opClass="SimdAddAcc", opLat=4),
-        OpDesc(opClass="SimdAlu", opLat=4),
-        OpDesc(opClass="SimdCmp", opLat=4),
-        OpDesc(opClass="SimdCvt", opLat=3),
-        OpDesc(opClass="SimdMisc", opLat=3),
-        OpDesc(opClass="SimdMult", opLat=5),
-        OpDesc(opClass="SimdMultAcc", opLat=5),
-        OpDesc(opClass="SimdMatMultAcc", opLat=5),
-        OpDesc(opClass="SimdShift", opLat=3),
-        OpDesc(opClass="SimdShiftAcc", opLat=3),
-        OpDesc(opClass="SimdSqrt", opLat=9),
-        OpDesc(opClass="SimdFloatAdd", opLat=5),
-        OpDesc(opClass="SimdFloatAlu", opLat=5),
-        OpDesc(opClass="SimdFloatCmp", opLat=3),
-        OpDesc(opClass="SimdFloatCvt", opLat=3),
-        OpDesc(opClass="SimdFloatDiv", opLat=3),
-        OpDesc(opClass="SimdFloatMisc", opLat=3),
-        OpDesc(opClass="SimdFloatMult", opLat=3),
-        OpDesc(opClass="SimdFloatMultAcc", opLat=5),
-        OpDesc(opClass="SimdFloatMatMultAcc", opLat=5),
-        OpDesc(opClass="SimdFloatSqrt", opLat=9),
         OpDesc(opClass="FloatAdd", opLat=5),
         OpDesc(opClass="FloatCmp", opLat=5),
         OpDesc(opClass="FloatCvt", opLat=5),
@@ -55,6 +33,8 @@ class O3_ARM_Cortex_x2_FP(FUDesc):
     ]
     count = 4
 
+class O3_ARM_Cortex_x2_SIMD(SIMD_Unit):
+    count = 2
 
 # Load/Store Units
 class O3_ARM_Cortex_x2_Load(FUDesc):
@@ -81,6 +61,7 @@ class O3_ARM_Cortex_x2_FUP(FUPool):
         O3_ARM_Cortex_x2_Load(),
         O3_ARM_Cortex_x2_Store(),
         O3_ARM_Cortex_x2_FP(),
+        O3_ARM_Cortex_x2_SIMD(),
     ]
 
 
@@ -199,7 +180,7 @@ class O3_ARM_Cortex_x2L2(Cache):
     response_latency = 12
     mshrs = 16
     tgts_per_mshr = 8
-    size = "1MiB"
+    size = "8MiB"
     assoc = 8
     write_buffers = 8
     clusivity = "mostly_excl"
@@ -207,3 +188,14 @@ class O3_ARM_Cortex_x2L2(Cache):
     prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = RandomRP()
+
+class O3_ARM_Cortex_x2_L3(Cache):
+    size = "32MiB"
+    assoc = 16
+    tag_latency = 7
+    data_latency = 7
+    response_latency = 7
+    mshrs = 20
+    tgts_per_mshr = 12
+    write_buffers = 16
+    clusivity = "mostly_excl"

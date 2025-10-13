@@ -107,7 +107,8 @@ def create(args):
     # clusters have core-private L1 caches and an L2 that's shared
     # within the cluster.
     # system.addCaches(want_caches, last_cache_level=2)
-    system.addCaches_l3size(want_caches, last_cache_level=3, l3_size="8MiB")
+    system.setL3Type(O3_ARM_Cortex_x4.O3_ARM_Cortex_x4_L3)
+    system.addCaches(want_caches, last_cache_level=3)
 
     # Setup gem5's minimal Linux boot loader.
     system.realview.setupBootLoader(system, SysPaths.binary)

@@ -380,6 +380,7 @@ class ClusterSystem:
             else:
                 self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
             self.toL3Bus = L2XBar(width=64)
+            self.toL3Bus.snoop_filter.max_capacity = "128MiB"
             self.toL3Bus.mem_side_ports = self.l3.cpu_side
             self.l3.mem_side = self.membus.cpu_side_ports
             cluster_mem_bus = self.toL3Bus
