@@ -1,99 +1,107 @@
 # The gem5 Simulator
 
-This is the repository for the gem5 simulator. It contains the full source code
-for the simulator and all tests and regressions.
+This git is forked from gem5, please see [gem5](./README_gem5.md) for more details.
 
-The gem5 simulator is a modular platform for computer-system architecture
-research, encompassing system-level architecture as well as processor
-microarchitecture. It is primarily used to evaluate new hardware designs,
-system software changes, and compile-time and run-time system optimizations.
+## build
 
-The main website can be found at <http://www.gem5.org>.
+### prepare
+```bash
+# 1. git
+sudo apt install git
+# 2. gcc 10+, We support GCC Versions >=10, up to GCC 13
+sudo apt install build-essential
+# 3. SCons 3.0+
+sudo apt install scons
+# 4. Python 3.6+
+sudo apt install python3-dev
+# 5. protobuf 2.1+ (Optional)
+sudo apt install libprotobuf-dev protobuf-compiler libgoogle-perftools-dev
+# 6. Boost (Optional)
+sudo apt install libboost-all-dev
+```
 
-## Testing status
+### build gem5
+```bash
+# Arm opt (with debug feature)
+python3 `which scons` build/ARM/gem5.opt -j9
+# Arm fast (faster without debug feature)
+python3 `which scons` build/ARM/gem5.fast -j9
 
-**Note**: These regard tests run on the develop branch of gem5:
-<https://github.com/gem5/gem5/tree/develop>.
+# RISCV opt (with debug feature)
+python3 `which scons` build/RISCV/gem5.opt -j9
+# RISCV fast (faster without debug feature)
+python3 `which scons` build/RISCV/gem5.fast -j9
+```
 
-[![Daily Tests](https://github.com/gem5/gem5/actions/workflows/daily-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/daily-tests.yaml)
-[![Weekly Tests](https://github.com/gem5/gem5/actions/workflows/weekly-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/weekly-tests.yaml)
-[![Compiler Tests](https://github.com/gem5/gem5/actions/workflows/compiler-tests.yaml/badge.svg?branch=develop)](https://github.com/gem5/gem5/actions/workflows/compiler-tests.yaml)
+| type  | description                                                                                                                                                                                                                                                                                                                                                                      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| debug | Built with no optimizations and debug symbols. This binary is useful when using a debugger to debug if the variables you need to view are optimized out in the opt version of gem5. Running with debug is slow compared to the other binaries.                                                                                                                            |
+| opt   | This binary is build with most optimizations on (e.g., -O3), but with debug symbols included. This binary is much faster than debug, but still contains enough debug information to be able to debug most problems.                                                                                                                                                       |
+| fast  | Built with all optimizations on (including link-time optimizations on supported platforms) and with no debug symbols. Additionally, any asserts are removed, but panics and fatals are still included. fast is the highest performing binary, and is much smaller than opt. However, fast is only appropriate when you feel that it is unlikely your code has major bugs. |
 
-## Getting started
+## Arm cortex simulator
+### config
+- [x2](configs/common/cores/arm/O3_ARM_Cortex_x2.py)
+- [x3](configs/common/cores/arm/O3_ARM_Cortex_x3.py)
+- [x3](configs/common/cores/arm/O3_ARM_Cortex_x3.py)
 
-A good starting point is <http://www.gem5.org/about>, and for
-more information about building the simulator and getting started
-please see <http://www.gem5.org/documentation> and
-<http://www.gem5.org/documentation/learning_gem5/introduction>.
+### download arm kernel and ramdisk
 
-## Building gem5
+```bash
+wget http://dist.gem5.org/dist/v22-0/arm/aarch-system-20220707.tar.bz2
+wget http://dist.gem5.org/dist/v22-0/arm/disks/ubuntu-18.04-arm64-docker.img.bz2
 
-To build gem5, you will need the following software: g++ or clang,
-Python (gem5 links in the Python interpreter), SCons, zlib, m4, and lastly
-protobuf if you want trace capture and playback support. Please see
-<http://www.gem5.org/documentation/general_docs/building> for more details
-concerning the minimum versions of these tools.
+tar -xvjf aarch-system-20220707.tar.bz2
+bunzip2 ubuntu-18.04-arm64-docker.img.bz2
 
-Once you have all dependencies resolved, execute
-`scons build/ALL/gem5.opt` to build an optimized version of the gem5 binary
-(`gem5.opt`) containing all gem5 ISAs. If you only wish to compile gem5 to
-include a single ISA, you can replace `ALL` with the name of the ISA. Valid
-options include `ARM`, `NULL`, `MIPS`, `POWER`, `RISCV`, `SPARC`, and `X86`
-The complete list of options can be found in the build_opts directory.
+ls
+aarch-system-20220707.tar.bz2  binaries  disks  ubuntu-18.04-arm64-docker.img
+```
 
-See https://www.gem5.org/documentation/general_docs/building for more
-information on building gem5.
+### add custum bin to ramdisk
+```bash
+cd {path_to_gem5}
+python3 ./util/gem5img.py mount {path_to_arm_linux_images}/ubuntu-18.04-arm64-docker.img {local_mount_point}
 
-## The Source Tree
+#copy bin into disk image
+cp -r {custom_bin} {local_mount_point}/home
 
-The main source tree includes these subdirectories:
+#unmonut disk image.
+python3 ./util/gem5img.py umount {local_mount_point}
+```
 
-* build_opts: pre-made default configurations for gem5
-* build_tools: tools used internally by gem5's build process.
-* configs: example simulation configuration scripts
-* ext: less-common external packages needed to build gem5
-* include: include files for use in other programs
-* site_scons: modular components of the build system
-* src: source code of the gem5 simulator. The C++ source, Python wrappers, and Python standard library are found in this directory.
-* system: source for some optional system software for simulated systems
-* tests: regression tests
-* util: useful utility programs and files
+### run
+```bash
+export gem5_home={path_to_gem5}
+export M5_PATH={path_to_arm_linux_images}
 
-## gem5 Resources
+# start kernel with x2
+$gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x2.py --cpu="o3"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
 
-To run full-system simulations, you may need compiled system firmware, kernel
-binaries and one or more disk images, depending on gem5's configuration and
-what type of workload you're trying to run. Many of these resources can be
-obtained from <https://resources.gem5.org>.
+# start kernel with x3
+$gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x3.py --cpu="o3"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
 
-More information on gem5 Resources can be found at
-<https://www.gem5.org/documentation/general_docs/gem5_resources/>.
+# start kernel with x4
+$gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x4.py --cpu="o3"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
 
-## Getting Help, Reporting bugs, and Requesting Features
+# term to kernel in another shell
+$gem5_home/util/term/gem5term localhost 3456
 
-We provide a variety of channels for users and developers to get help, report
-bugs, requests features, or engage in community discussions. Below
-are a few of the most common we recommend using.
+```
 
-* **GitHub Discussions**: A GitHub Discussions page. This can be used to start
-discussions or ask questions. Available at
-<https://github.com/orgs/gem5/discussions>.
-* **GitHub Issues**: A GitHub Issues page for reporting bugs or requesting
-features. Available at <https://github.com/gem5/gem5/issues>.
-* **Jira Issue Tracker**: A Jira Issue Tracker for reporting bugs or requesting
-features. Available at <https://gem5.atlassian.net/>.
-* **Slack**: A Slack server with a variety of channels for the gem5 community
-to engage in a variety of discussions. Please visit
-<https://www.gem5.org/join-slack> to join.
-* **gem5-users@gem5.org**: A mailing list for users of gem5 to ask questions
-or start discussions. To join the mailing list please visit
-<https://www.gem5.org/mailing_lists>.
-* **gem5-dev@gem5.org**: A mailing list for developers of gem5 to ask questions
-or start discussions. To join the mailing list please visit
-<https://www.gem5.org/mailing_lists>.
+## Acceleration with checkpoint
 
-## Contributing to gem5
+```bash
+# run atomic core to start kernel
+$gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x3.py --cpu="atomic"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
 
-We hope you enjoy using gem5. When appropriate we advise sharing your
-contributions to the project. <https://www.gem5.org/contributing> can help you
-get started. Additional information can be found in the CONTRIBUTING.md file.
+# term to kernel
+$gem5_home/util/term/gem5term localhost 3456
+
+# save checkpoint
+m5 checkpoint
+
+# start O3 core to acceleration
+# cpt.7368810596684 is the checkpoint file name in m5out folder
+$gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x3.py --restore=$gem5_home/m5out/cpt.7368810596684 --cpu="o3"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
+```
