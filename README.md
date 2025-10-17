@@ -43,7 +43,7 @@ python3 `which scons` build/RISCV/gem5.fast -j9
 ### config
 - [x2](configs/common/cores/arm/O3_ARM_Cortex_x2.py)
 - [x3](configs/common/cores/arm/O3_ARM_Cortex_x3.py)
-- [x3](configs/common/cores/arm/O3_ARM_Cortex_x3.py)
+- [x4](configs/common/cores/arm/O3_ARM_Cortex_x4.py)
 
 ### download arm kernel and ramdisk
 
