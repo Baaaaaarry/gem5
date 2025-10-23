@@ -86,7 +86,14 @@ $gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x4.py -
 
 # term to kernel in another shell
 $gem5_home/util/term/gem5term localhost 3456
+```
 
+## run with DDR
+--mem-channels: memory channels
+--mem-type: use "LPDDR5_8533_1x16_BG_BL32" for sim 8650 ddr
+
+```bash
+./build/ARM/gem5.fast configs/example/arm/starter_fs_x3.py --cpu="o3" --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1 --mem-channels=4 --mem-type="LPDDR5_8533_1x16_BG_BL32"
 ```
 
 ## Acceleration with checkpoint
