@@ -366,3 +366,68 @@ class LPDDR5_6400_1x16_8B_BL32(LPDDR5_6400_1x16_BG_BL32):
     tCCD_L = "0ns"
     tRRD_L = "0ns"
     tWTR_L = "0ns"
+
+class LPDDR5_8533_1x16_BG_BL32(LPDDR5_6400_1x16_BG_BL32):
+    """
+    A single LPDDR5 x16 interface (one command/address bus)
+    for a single x16 channel with timings based on LPDDR5X specification.
+
+    8.533Gbps data rates and 8Gbit die.
+
+    Configuring for 16-bank mode with bank-group architecture
+    burst of 32, which means bursts can be interleaved.
+    """
+
+    # 8.533Gb/s DDR with 4:1 WCK:CK ratio for 1066.67 MHz CK
+    tCK = "0.9375ns"
+
+    # Base RL is 20 CK @ 1066.67 MHz = 18.75ns
+    tCL = "18.75ns"
+
+    # With BG architecture, burst of 32 transferred in two 16-beat
+    # sub-bursts, with a 16-beat gap in between.
+    # Each 16-beat sub-burst is 8 WCK @4.2667 GHz or 2 CK @ 1066.67 MHz
+    # tBURST is the delay to transfer the Bstof32 = 6 CK @ 1066.67 MHz
+    tBURST = "5.625ns"
+    # can interleave a Bstof32 from another bank group at tBURST_MIN
+    # 16-beats is 8 WCK @4.2667 GHz or 2 CK @ 1066.67 MHz
+    tBURST_MIN = "1.875ns"
+    # tBURST_MAX is the maximum burst delay for same bank group timing
+    # this is 8 CK @ 1066.67 MHz
+    tBURST_MAX = "7.5ns"
+
+    # 8 CK @ 1066.67 MHz
+    tCCD_L = "7.5ns"
+
+    # Required RD-to-WR timing is RL+ BL/n + tWCKDQ0/tCK - WL
+    # tWCKDQ0/tCK will be 1 CK for most cases
+    # For gem5 RL = WL and BL/n is already accounted for with tBURST
+    # Result is and additional 1 CK is required
+    tRTW = "0.9375ns"
+
+    # Default different rank bus delay to 2 CK, @1066.67 MHz = 1.875 ns
+    tCS = "1.875ns"
+
+    # 2 CK
+    tPPD = "1.875ns"
+
+    # 2 command phases can be sent back-to-back or
+    # with a gap up to tAAD = 8 CK
+    tAAD = "7.5ns"
+
+    # 为了支持4通道x16位配置实现68.2GB/s带宽，以下是系统级配置指南:
+    #
+    # 在系统配置文件中使用此接口时，应创建4个LPDDR5_8533_1x16_BG_BL32实例
+    # 每个实例代表一个独立的通道，以实现总带宽：
+    # 8533 Mbps/通道 × 16位/8 (字节转换) × 4通道 = 68.264 GB/s
+    #
+    # 示例配置代码：
+    # system.mem_ctrls = [
+    #     MemCtrl(dram=LPDDR5_8533_1x16_BG_BL32(), ...),
+    #     MemCtrl(dram=LPDDR5_8533_1x16_BG_BL32(), ...),
+    #     MemCtrl(dram=LPDDR5_8533_1x16_BG_BL32(), ...),
+    #     MemCtrl(dram=LPDDR5_8533_1x16_BG_BL32(), ...),
+    # ]
+    #
+    # 对于PoP (Package on Package) 实现，应确保物理布局参数与实际硬件匹配
+    # 由于这是模拟器配置，主要关注时序和带宽参数即可
