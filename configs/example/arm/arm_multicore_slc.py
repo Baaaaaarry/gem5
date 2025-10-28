@@ -172,7 +172,7 @@ def createSystem(
     )
 
     # sys.mem_ctrls = [
-    #     SimpleMemory(range=r, port=sys.membus.mem_side_ports, latency="10ns", bandwidth="32GB/s")
+    #     SimpleMemory(range=r, port=sys.membus.mem_side_ports)
     #     for r in sys.mem_ranges
     # ]
     MemConfig.config_mem(options, sys)
@@ -263,13 +263,13 @@ def addOptions(parser):
     parser.add_argument(
         "--big-cpus",
         type=int,
-        default=1,
+        default=4,
         help="Number of big CPUs to instantiate",
     )
     parser.add_argument(
         "--little-cpus",
         type=int,
-        default=1,
+        default=4,
         help="Number of little CPUs to instantiate",
     )
     parser.add_argument(
@@ -357,18 +357,41 @@ def addOptions(parser):
         help="Doesn't run simulation, it generates a DTB only",
     )
 
+    # 新增功能 #
     parser.add_argument(
         "--slice-run",
         action="store_true",
         default=False,
         help="Run Simulation in time slices and periodically dump stats"
     )
-
+    parser.add_argument(
+        "--slices",
+        type=int,
+        default=100000,
+        help="启动切片运行的总slice数(0 表示不用切片)"
+    )
     parser.add_argument(
         "--slice-ticks",
         type=str,
         default="1s",
         help="Length of each simulation slice(e.g., 1ms, 1s)"
+    )
+    parser.add_argument(
+        "--save-slices",
+        action="store_true",
+        default=False,
+        help="在每个slice结束时保存断点"
+    )
+    parser.add_argument(
+        "--restore-slice",
+        type=int,
+        default=-1,
+        help="从指令slice的checkpoint恢复"
+    )
+    parser.add_argument(
+        "--ckpt-dir",
+        type=str,
+        default=os.path.abspath(os.path.join(m5.options.outdir, "ckpts")),
     )
     return parser
 
@@ -503,10 +526,30 @@ def _build_kvm(options, system, cpus):
                 obj.eventq_index = device_eq
             cpu.eventq_index = first_cpu_eq + idx
 
+def _resolve_slice_dir(options):
+    base = os.path.abspath(os.path.normpath(options.ckpt_dir))
+    cdir = os.path.join(base, f"slice_{options.restore_slice:04d}")
+    cdir = os.path.abspath(cdir)
+    print(f"[restore] trying slice dir: {cdir}")
 
+    if not os.path.isdir(cdir):
+        parent = os.path.dirname(cdir)
+        try:
+            listing = ", ".join(sorted(os.listdir(parent)))
+        except Exception as e:
+            listing = f"<cannot list {parent}: {e}>"
+        m5.util.panic(
+            f"Restore slice directory not found:\n"
+            f" expected:{cdir}\n"
+            f" parent:  {parent}\n"
+            f" entries: {listing}\n"
+        )
+    return cdir
 def instantiate(options, checkpoint_dir=None):
-    # Setup the simulation quantum if we are running in PDES-mode
-    # (e.g., when using KVM)
+    # 按slice保存恢复
+    if options.restore_slice is not None and options.restore_slice >= 0:
+        options.restore_from = _resolve_slice_dir(options)
+
     root = Root.getInstance()
     if root and _using_pdes(root):
         m5.util.inform(
@@ -530,19 +573,35 @@ def instantiate(options, checkpoint_dir=None):
 def _to_tick(s):
     return int(m5.ticks.fromSeconds(m5.util.convert.anyToLatency(s)))
 
-def run(checkpoint_dir=m5.options.outdir, slice_ticks=None, slice_run=False):
-    if slice_run:
-        m5.util.inform("Running in slice mode, slice length = %s" % slice_ticks)
-        tick_budget = _to_tick(slice_ticks)
-        slice_index = 0
-        while True:
-            event = m5.simulate(tick_budget)
-            cause = event.getCause()
+def _dump_stats_with_marker(s, prefix="slice"):
+    print(f"{prefix} {s} Begin Simulation Statistics")
+    m5.stats.dump()
+    m5.stats.reset()
+    print(f"[{prefix} {s}] End Simulation Statistics")
+
+
+def run(options):
+    os.makedirs(options.ckpt_dir, exist_ok=True)
+    #起始slice序号：指定 id + 1开始
+    start_slice = options.restore_slice + 1 if options.restore_slice >= 0 else 0
+    if start_slice < 0:
+        m5.util.panic("Using slice-run, but --slices and --slice-ticks must be > 0")
+
+    if options.slice_run:
+        options.slice_ticks = int(_to_ticks(options.slice_ticks))
+        for s in range(start_slice, options.slices):
+            slice_end_tick = (s + 1) * options.slice_ticks
             now = m5.curTick()
-            print(f"[slice {slice_index}] cause={cause} @ {now}")
-            m5.stats.dump()
-            m5.stats.reset()
-            slice_index += 1
+            delta = max(0, slice_end_tick - now)
+            print(f"[slice {s} run {delta} tick (from {now} to {slice_end_tick})]")
+            ev = m5.simulate(delta)
+            cause = ev.getCause()
+            print(f"[slice {s} cause={cause} @ {m5.curTick()}]")
+            _dump_stats_with_marker(s)
+            if options.save_slices:
+                cpt_dir = os.path.join(options.ckpt_dir, f"slice_{s:04d}")
+                print(f"[slice {s} save checkpoint --> {cpt_dir}]")
+                m5.checkpoint(cpt_dir)
 
     # start simulation (and drop checkpoints when requested)
     else:
@@ -551,7 +610,7 @@ def run(checkpoint_dir=m5.options.outdir, slice_ticks=None, slice_run=False):
             exit_msg = event.getCause()
             if exit_msg == "checkpoint":
                 print("Dropping checkpoint at tick %d" % m5.curTick())
-                cpt_dir = os.path.join(checkpoint_dir, "cpt.%d" % m5.curTick())
+                cpt_dir = os.path.join(options.outdir, "cpt.%d" % m5.curTick())
                 m5.checkpoint(cpt_dir)
                 print("Checkpoint done.")
             else:
@@ -576,10 +635,8 @@ def main():
     instantiate(options)
     if options.dtb_gen:
         generateDtb(root)
-    if options.slice_run:
-        run(slice_ticks=options.slice_ticks, slice_run=True)
     else:
-        run()
+        run(options)
 
 
 if __name__ == "__m5_main__":
