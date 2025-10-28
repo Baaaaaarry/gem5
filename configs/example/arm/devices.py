@@ -80,14 +80,29 @@ class L2(L2Cache):
 
 
 class L3(Cache):
+    size = "8MiB"
+    assoc = 16
+    tag_latency = 10
+    data_latency = 4
+    response_latency = 3
+    mshrs = 32
+    tgts_per_mshr = 16
+    writeback_clean = True
+    write_buffers = 64
+    clusivity = "mostly_excl"
+    prefetcher = NULL
+
+class SLC(Cache):
     size = "16MiB"
     assoc = 16
-    tag_latency = 20
-    data_latency = 20
-    response_latency = 20
-    mshrs = 20
-    tgts_per_mshr = 12
-    clusivity = "mostly_excl"
+    tag_latency = 10
+    data_latency = 10
+    response_latency = 1
+    mshrs = 64
+    tgts_per_mshr = 64
+    writeback_clean = True
+    clusivity = "mostly_incl"
+    prefetcher = NULL
 
 
 class MemBus(SystemXBar):
@@ -346,16 +361,12 @@ class ClusterSystem:
 
     def __init__(self, **kwargs):
         self._clusters = []
-        self._l3_type = None
 
     def numCpuClusters(self):
         return len(self._clusters)
 
     def addCpuCluster(self, cpu_cluster):
         self._clusters.append(cpu_cluster)
-
-    def setL3Type(self, l3_type):
-        self._l3_type = l3_type
 
     def addCaches(self, need_caches, last_cache_level):
         if not need_caches:
@@ -375,19 +386,38 @@ class ClusterSystem:
             max_clock_cluster = max(
                 self._clusters, key=lambda c: c.clk_domain.clock[0]
             )
-            if self._l3_type is not None:
-                self.l3 = self._l3_type(clk_domain=max_clock_cluster.clk_domain)
-            else:
-                self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
-            self.toL3Bus = L2XBar(width=64)
-            self.toL3Bus.snoop_filter.max_capacity = "128MiB"
-            self.toL3Bus.mem_side_ports = self.l3.cpu_side
-            self.l3.mem_side = self.membus.cpu_side_ports
+            self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
+            self.toL3Bus = CoherentXBar(
+                clk_domain = self.clk_domain,
+                frontend_latency = 1,
+                forward_latency = 1,
+                response_latency = 1,
+                snoop_response_latency = 1,
+                width = 256, #TODO：具体大小配置
+                point_of_coherency = False,
+                point_of_unification = False,
+            )
+            self.l3.cpu_side = self.toL3Bus.mem_side_ports
             cluster_mem_bus = self.toL3Bus
+            # connect each cluster to the memory hierarchy
+            for cluster in self._clusters:
+                cluster.connectMemSide(cluster_mem_bus)
 
-        # connect each cluster to the memory hierarchy
-        for cluster in self._clusters:
-            cluster.connectMemSide(cluster_mem_bus)
+
+            self.L3XBar = CoherentXBar(
+                clk_domain = self.clk_domain,
+                frontend_latency = 1,
+                forward_latency = 1,
+                response_latency = 1,
+                snoop_response_latency = 0,
+                width = 256, #TODO：具体大小配置
+                point_of_coherency = False,
+                point_of_unification = False,
+            )
+            self.l3.mem_side = self.L3XBar.cpu_side_ports
+            self.slc = SLC()
+            self.slc.cpu_side = self.L3XBar.mem_side_ports
+            self.slc.mem_side = self.membus.cpu_side_ports
 
 class SimpleSeSystem(System, ClusterSystem):
     """
