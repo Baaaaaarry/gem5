@@ -51,6 +51,7 @@ m5.util.addToPath("../../")
 import devices
 from common import (
     FSConfig,
+    MemConfig,
     ObjectList,
     Options,
     SysPaths,
@@ -136,20 +137,18 @@ class A720LittleCluster(devices.ArmCpuCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
-class SLC(Cache):
-    size = "32MiB"
+
+class L3Cache(Cache):
+    size = "10MiB"
     assoc = 16
-    tag_latency = 20
-    data_latency = 20
-    response_latency = 2
-    mshrs = 256
-    tgts_per_mshr = 32
+    tag_latency = 10
+    data_latency = 4
+    response_latency = 3
+    mshrs = 32
+    tgts_per_mshr = 16
     writeback_clean = True
     clusivity = "mostly_incl"
-    prefetcher = StridePrefetcher(
-        on_data=True, on_miss=False, on_read=True, on_write=True,
-        degree=4, latency=1, use_virtual_addresses=False
-    )
+    prefetcher = NULL
 
 def createSystem(
     caches,
@@ -159,6 +158,7 @@ def createSystem(
     disks=[],
     mem_size=default_mem_size,
     bootloader=None,
+    options=None,
 ):
     platform = ObjectList.platform_list.get(machine_type)
     m5.util.inform("Simulated platform: %s", platform.__name__)
@@ -171,10 +171,11 @@ def createSystem(
         readfile=bootscript,
     )
 
-    sys.mem_ctrls = [
-        SimpleMemory(range=r, port=sys.membus.mem_side_ports)
-        for r in sys.mem_ranges
-    ]
+    # sys.mem_ctrls = [
+    #     SimpleMemory(range=r, port=sys.membus.mem_side_ports, latency="10ns", bandwidth="32GB/s")
+    #     for r in sys.mem_ranges
+    # ]
+    MemConfig.config_mem(options, sys)
 
     sys.connect()
 
@@ -262,19 +263,19 @@ def addOptions(parser):
     parser.add_argument(
         "--big-cpus",
         type=int,
-        default=4,
+        default=1,
         help="Number of big CPUs to instantiate",
     )
     parser.add_argument(
         "--little-cpus",
         type=int,
-        default=4,
+        default=1,
         help="Number of little CPUs to instantiate",
     )
     parser.add_argument(
         "--caches",
         action="store_true",
-        default=False,
+        default=True,
         help="Instantiate caches",
     )
     parser.add_argument(
@@ -307,6 +308,15 @@ def addOptions(parser):
         type=str,
         default=default_mem_size,
         help="System memory size",
+    )
+    parser.add_argument(
+        "--mem-type",
+        default="LPDDR5_6400_1x16_BG_BL32",
+        choices=ObjectList.mem_list.get_names(),
+        help="type of memory to use",
+    )
+    parser.add_argument(
+        "--mem-channels", type=int, default=4, help="number of memory channels"
     )
     parser.add_argument(
         "--kernel-cmd",
@@ -346,6 +356,20 @@ def addOptions(parser):
         action="store_true",
         help="Doesn't run simulation, it generates a DTB only",
     )
+
+    parser.add_argument(
+        "--slice-run",
+        action="store_true",
+        default=False,
+        help="Run Simulation in time slices and periodically dump stats"
+    )
+
+    parser.add_argument(
+        "--slice-ticks",
+        type=str,
+        default="1s",
+        help="Length of each simulation slice(e.g., 1ms, 1s)"
+    )
     return parser
 
 
@@ -378,6 +402,7 @@ def build(options):
         disks=disks,
         mem_size=options.mem_size,
         bootloader=options.bootloader,
+        options=options
     )
 
     root.system = system
@@ -417,42 +442,8 @@ def build(options):
     ):
         m5.util.panic("Memory mode missmatch among CPU clusters")
 
-    system.toL3Bus = CoherentXBar(
-        clk_domain = system.clk_domain,
-        frontend_latency = 1,
-        forward_latency = 1,
-        response_latency = 1,
-        snoop_response_latency = 1,
-        width = 64,
-        point_of_coherency = False,
-        point_of_unification = True,
-    )
-
-    mb = system.membus
-    mb.point_of_coherency = True
-    mb.point_of_unification = True
-    mb.snoop_filter = SnoopFilter(
-        lookup_latency = 1,
-        max_capacity = "32MiB",
-    )
-
-    system.l3 = SLC()
-    system.l3.system = system
-    system.l3.clk_domain = system.clk_domain
-
-    if options.big_cpus > 0:
-        system.bigCluster.connect(system.toL3Bus)
-    if options.little_cpus > 0:
-        system.littleCluster.connect(system.toL3Bus)
-
-    system.toL3Bus.point_of_coherency = False
-    system.membus.point_of_coherency = True
-    system.membus.point_of_unification = True
-
-    # L3 <-> DRAM
-    system.l3.mem_side = system.membus.cpu_side_ports
-    system.l3.cpu_side = system.toL3Bus.mem_side_ports
-
+    # add L3 & SLC inside
+    system.addCaches(options.caches, options.last_cache_level)
 
     # Create a KVM VM and do KVM-specific configuration
     if issubclass(big_model, KvmCluster):
@@ -481,11 +472,6 @@ def build(options):
 
     if options.vio_9p:
         FSConfig.attach_9p(system.realview, system.iobus)
-
-    # for cpu in system.bigCluster.cpus:
-    #     cpu.progress_interval = "1000000000000"
-    # for cpu in system.littleCluster.cpus:
-    #     cpu.progress_interval = "1000000000000"
 
     return root
 
@@ -541,20 +527,36 @@ def instantiate(options, checkpoint_dir=None):
     else:
         m5.instantiate()
 
+def _to_tick(s):
+    return int(m5.ticks.fromSeconds(m5.util.convert.anyToLatency(s)))
 
-def run(checkpoint_dir=m5.options.outdir):
+def run(checkpoint_dir=m5.options.outdir, slice_ticks=None, slice_run=False):
+    if slice_run:
+        m5.util.inform("Running in slice mode, slice length = %s" % slice_ticks)
+        tick_budget = _to_tick(slice_ticks)
+        slice_index = 0
+        while True:
+            event = m5.simulate(tick_budget)
+            cause = event.getCause()
+            now = m5.curTick()
+            print(f"[slice {slice_index}] cause={cause} @ {now}")
+            m5.stats.dump()
+            m5.stats.reset()
+            slice_index += 1
+
     # start simulation (and drop checkpoints when requested)
-    while True:
-        event = m5.simulate()
-        exit_msg = event.getCause()
-        if exit_msg == "checkpoint":
-            print("Dropping checkpoint at tick %d" % m5.curTick())
-            cpt_dir = os.path.join(checkpoint_dir, "cpt.%d" % m5.curTick())
-            m5.checkpoint(cpt_dir)
-            print("Checkpoint done.")
-        else:
-            print(exit_msg, " @ ", m5.curTick())
-            break
+    else:
+        while True:
+            event = m5.simulate()
+            exit_msg = event.getCause()
+            if exit_msg == "checkpoint":
+                print("Dropping checkpoint at tick %d" % m5.curTick())
+                cpt_dir = os.path.join(checkpoint_dir, "cpt.%d" % m5.curTick())
+                m5.checkpoint(cpt_dir)
+                print("Checkpoint done.")
+            else:
+                print(exit_msg, " @ ", m5.curTick())
+                break
 
     sys.exit(event.getCode())
 
@@ -574,6 +576,8 @@ def main():
     instantiate(options)
     if options.dtb_gen:
         generateDtb(root)
+    if options.slice_run:
+        run(slice_ticks=options.slice_ticks, slice_run=True)
     else:
         run()
 

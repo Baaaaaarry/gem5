@@ -128,16 +128,6 @@ class O3_ARM_Cortex_x4(ArmO3CPU):
     switched_out = False
     branchPred = O3_ARM_Cortex_x4_BP()
 
-    mmu = ArmMMU(
-        l2_shared=ArmTLB(
-            entry_type="unified", size=2048, assoc=4, partial_levels=["L2"]
-        ),
-        itb=ArmTLB(
-            entry_type="instruction", size=48, next_level=Parent.l2_shared
-        ),
-        dtb=ArmTLB(entry_type="data", size=48, next_level=Parent.l2_shared),
-    )
-
 # Instruction Cache
 class O3_ARM_Cortex_x4_ICache(Cache):
     tag_latency = 1
@@ -171,52 +161,13 @@ class O3_ARM_Cortex_x4L2(Cache):
     response_latency = 12
     mshrs = 24
     tgts_per_mshr = 16
-    size = "8MiB"
+    size = "1MiB"
     assoc = 8
     write_buffers = 8
+    writeback_clean = True
     clusivity = "mostly_excl"
     # Simple stride prefetcher
-    prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
+    #prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
+    prefetcher = NULL
     tags = BaseSetAssoc()
     replacement_policy = LRURP()
-
-class O3_ARM_Cortex_x4_L3(Cache):
-    size = "32MiB"
-    assoc = 16
-    tag_latency = 7
-    data_latency = 7
-    response_latency = 7
-    mshrs = 64
-    tgts_per_mshr = 64
-    write_buffers = 64
-    clusivity = "mostly_excl"
-
-# MMU配置
-class O3_ARM_Cortex_x4_MMU:
-    def __init__(self):
-        # 指令TLB配置
-        self.itb = ArmITB(
-            size=48,
-            assoc=3,
-            is_stage2=False,
-            lookup_latency=1,
-            fill_latency=10,
-            tlb_level=1
-        )
-        # 数据TLB配置
-        self.dtb = ArmDTB(
-            size=48,
-            assoc=3,
-            is_stage2=False,
-            lookup_latency=1,
-            fill_latency=10,
-            tlb_level=1
-        )
-        # L2共享TLB配置
-        self.l2_tlb = BaseTLB(
-            size=2048,
-            assoc=16,
-            lookup_latency=2,
-            fill_latency=20,
-            tlb_level=2
-        )
