@@ -610,7 +610,7 @@ def run(options):
             exit_msg = event.getCause()
             if exit_msg == "checkpoint":
                 print("Dropping checkpoint at tick %d" % m5.curTick())
-                cpt_dir = os.path.join(options.outdir, "cpt.%d" % m5.curTick())
+                cpt_dir = os.path.join(options.ckpt_dir, "cpt.%d" % m5.curTick())
                 m5.checkpoint(cpt_dir)
                 print("Checkpoint done.")
             else:
