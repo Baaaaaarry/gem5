@@ -114,7 +114,29 @@ class LittleCluster(devices.ArmCpuCluster):
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
 
-class X4BigCluster(devices.ArmCpuCluster):
+class L2PrivCluster(devices.ArmCpuCluster):
+
+    def addL2(self, clk_domain):
+        print("run in L2PrivCluster addL2")
+        for cpu in self.cpus:
+            cpu.privL2 = self._l2_type()
+            cpu.toL2Bus = CoherentXBar(width=1024,
+                                    clk_domain=clk_domain,
+                                    frontend_latency=0,
+                                    forward_latency=0,
+                                    response_latency=0,
+                                    header_latency=0,
+                                    snoop_response_latency=0)
+
+            cpu.connectCachedPorts(cpu.toL2Bus.cpu_side_ports)
+            cpu.toL2Bus.mem_side_ports = cpu.privL2.cpu_side
+
+    def connectMemSide(self, bus):
+        print("run in L2PrivCluster connectMemSide")
+        for cpu in self.cpus:
+            cpu.privL2.mem_side = bus.cpu_side_ports
+
+class X4BigCluster(L2PrivCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("O3_ARM_Cortex_x4"),
@@ -124,9 +146,7 @@ class X4BigCluster(devices.ArmCpuCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
-
-
-class A720LittleCluster(devices.ArmCpuCluster):
+class A720LittleCluster(L2PrivCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("O3_ARM_Cortex_A720"),
@@ -136,7 +156,6 @@ class A720LittleCluster(devices.ArmCpuCluster):
 
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
-
 
 class L3Cache(Cache):
     size = "10MiB"

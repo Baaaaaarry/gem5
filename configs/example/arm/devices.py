@@ -103,6 +103,9 @@ class SLC(Cache):
 class MemBus(SystemXBar):
     badaddr_responder = BadAddr(warn_access="warn")
     default = Self.badaddr_responder.pio
+    snoop_filter = NULL
+    width = 128
+    response_latency = 3
 
 
 class ArmCpuCluster(CpuCluster):
@@ -390,10 +393,12 @@ class ClusterSystem:
                 forward_latency = 1,
                 response_latency = 1,
                 snoop_response_latency = 1,
-                width = 256, #TODO：具体大小配置
+                width = 128,
                 point_of_coherency = False,
                 point_of_unification = False,
+                max_outstanding_snoops = 490,
             )
+            self.toL3Bus.snoop_filter = SnoopFilter(lookup_latency=0, max_capacity="6MB")
             self.l3.cpu_side = self.toL3Bus.mem_side_ports
             cluster_mem_bus = self.toL3Bus
             # connect each cluster to the memory hierarchy
@@ -403,13 +408,14 @@ class ClusterSystem:
 
             self.toSLCBus = CoherentXBar(
                 clk_domain = self.clk_domain,
-                frontend_latency = 1,
+                frontend_latency = 3,
                 forward_latency = 1,
-                response_latency = 1,
-                snoop_response_latency = 0,
-                width = 256, #TODO：具体大小配置
+                response_latency = 3,
+                snoop_response_latency = 1,
+                width = 128,
                 point_of_coherency = False,
                 point_of_unification = False,
+                max_outstanding_snoops = 84
             )
             self.l3.mem_side = self.toSLCBus.cpu_side_ports
             self.slc = SLC()
