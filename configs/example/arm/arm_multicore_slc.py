@@ -411,7 +411,7 @@ def build(options):
         "rw",
         f"init={options.kernel_init}",
         "vmalloc=768MB",
-        "irqchip.gicv2.force_probe=1",
+        "swiotlb=force,swiotlb=512M",
     ]
 
     root = Root(full_system=True)
@@ -427,7 +427,7 @@ def build(options):
         bootloader=options.bootloader,
         options=options
     )
-
+    
     root.system = system
     if options.kernel_cmd:
         system.workload.command_line = options.kernel_cmd

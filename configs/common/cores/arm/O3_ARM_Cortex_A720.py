@@ -159,7 +159,7 @@ class O3_ARM_Cortex_A720L2(Cache):
     tag_latency = 12
     data_latency = 12
     response_latency = 12
-    mshrs = 24
+    mshrs = 32
     tgts_per_mshr = 16
     size = "512KiB"
     assoc = 8
@@ -168,6 +168,5 @@ class O3_ARM_Cortex_A720L2(Cache):
     writeback_clean = True
     # Simple stride prefetcher
     #prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
-    prefetcher = NULL
     tags = BaseSetAssoc()
     replacement_policy = LRURP()

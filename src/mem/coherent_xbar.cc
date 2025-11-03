@@ -196,7 +196,12 @@ CoherentXBar::recvTimingReq(PacketPtr pkt, PortID cpu_side_port_id)
     // the request
     const bool is_destination = isDestination(pkt);
 
-    const bool snoop_caches = !system->bypassCaches() &&
+    // patch: we skip uncacheable snoop according to ARM CHI protocol
+    const bool skip_uc_snoop = (pkt->req && pkt->req->isUncacheable() && pkt->isWrite());
+    DPRINTF(CoherentXBar, "%s: src %s skip uncacheable write cmd:%s of packet %s\n", __func__,
+            src_port->name(), pkt->cmdString(), pkt->print());
+
+    const bool snoop_caches = !skip_uc_snoop && !system->bypassCaches() &&
         pkt->cmd != MemCmd::WriteClean;
     if (snoop_caches) {
         assert(pkt->snoopDelay == 0);

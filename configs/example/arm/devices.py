@@ -85,12 +85,9 @@ class L3(Cache):
     tag_latency = 10
     data_latency = 4
     response_latency = 3
-    mshrs = 32
+    mshrs = 64
     tgts_per_mshr = 16
-    writeback_clean = True
-    write_buffers = 64
     clusivity = "mostly_excl"
-    prefetcher = NULL
 
 class SLC(Cache):
     size = "16MiB"
@@ -102,8 +99,6 @@ class SLC(Cache):
     tgts_per_mshr = 64
     writeback_clean = True
     clusivity = "mostly_incl"
-    prefetcher = NULL
-
 
 class MemBus(SystemXBar):
     badaddr_responder = BadAddr(warn_access="warn")
@@ -161,6 +156,8 @@ class ArmCpuCluster(CpuCluster):
         for cpu in self.cpus:
             cpu.connectCachedPorts(self.toL2Bus.cpu_side_ports)
         self.toL2Bus.mem_side_ports = self.l2.cpu_side
+        self.toL2Bus.point_of_coherency = False
+        self.toL2Bus.point_of_unification = False
 
     def addPMUs(
         self,
@@ -404,7 +401,7 @@ class ClusterSystem:
                 cluster.connectMemSide(cluster_mem_bus)
 
 
-            self.L3XBar = CoherentXBar(
+            self.toSLCBus = CoherentXBar(
                 clk_domain = self.clk_domain,
                 frontend_latency = 1,
                 forward_latency = 1,
@@ -414,10 +411,14 @@ class ClusterSystem:
                 point_of_coherency = False,
                 point_of_unification = False,
             )
-            self.l3.mem_side = self.L3XBar.cpu_side_ports
+            self.l3.mem_side = self.toSLCBus.cpu_side_ports
             self.slc = SLC()
-            self.slc.cpu_side = self.L3XBar.mem_side_ports
+            self.slc.cpu_side = self.toSLCBus.mem_side_ports
             self.slc.mem_side = self.membus.cpu_side_ports
+
+        # set the membus as PoC
+        self.membus.point_of_coherency = True
+        self.membus.point_of_unification = True
 
 class SimpleSeSystem(System, ClusterSystem):
     """
@@ -506,21 +507,16 @@ class SimpleSystem(BaseSimpleSystem):
         self.iobridge = Bridge(delay="50ns")
 
         self._caches = caches
-        if self._caches:
-            self.iocache = IOCache(addr_ranges=self.mem_ranges)
-        else:
-            self.dmabridge = Bridge(delay="50ns", ranges=self.mem_ranges)
-
+        self.dmabridge = Bridge(delay="50ns", ranges=self.mem_ranges)
+        if hasattr(self, "coherent_io"):
+            self.coherent_io = False
+        
     def connect(self):
         self.iobridge.mem_side_port = self.iobus.cpu_side_ports
         self.iobridge.cpu_side_port = self.membus.mem_side_ports
 
-        if self._caches:
-            self.iocache.mem_side = self.membus.cpu_side_ports
-            self.iocache.cpu_side = self.iobus.mem_side_ports
-        else:
-            self.dmabridge.mem_side_port = self.membus.cpu_side_ports
-            self.dmabridge.cpu_side_port = self.iobus.mem_side_ports
+        self.dmabridge.mem_side_port = self.membus.cpu_side_ports
+        self.dmabridge.cpu_side_port = self.iobus.mem_side_ports
 
         if hasattr(self.realview.gic, "cpu_addr"):
             self.gic_cpu_addr = self.realview.gic.cpu_addr
