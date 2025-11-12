@@ -122,9 +122,9 @@ class L2PrivCluster(devices.ArmCpuCluster):
             cpu.privL2 = self._l2_type()
             cpu.toL2Bus = CoherentXBar(width=1024,
                                     clk_domain=clk_domain,
-                                    frontend_latency=0,
+                                    frontend_latency=1,
                                     forward_latency=0,
-                                    response_latency=0,
+                                    response_latency=1,
                                     header_latency=0,
                                     snoop_response_latency=0)
 
