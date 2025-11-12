@@ -112,3 +112,8 @@ m5 checkpoint
 # cpt.7368810596684 is the checkpoint file name in m5out folder
 $gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x3.py --restore=$gem5_home/m5out/cpt.7368810596684 --cpu="o3"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
 ```
+## BUGFIX LIST
+1、增加定时保存和恢复断点功能：7431c4bb836bc9c2d224fae5d211017bda52233b
+2、多核一致性实现按照CHI协议修改：2fe92e4c477e07bcb9957fee2aa3859177377abc
+3、总线配置修改：b20b8601d9407b6ced071b846252f52ecdff1a9e
+4、CoherentXBar Latency设置不合理导致启动挂死问题修复：1d1312954ef0d086ae17218a8c68979d00604afa
