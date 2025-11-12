@@ -133,12 +133,13 @@ class O3_ARM_Cortex_x4_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 4
+    mshrs = 20
     tgts_per_mshr = 8
     size = "64KiB"
     assoc = 4
     is_read_only = True
     # Writeback clean lines as well
+    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
     writeback_clean = True
 
 # Data Cache
@@ -146,12 +147,13 @@ class O3_ARM_Cortex_x4_DCache(Cache):
     tag_latency = 2
     data_latency = 2
     response_latency = 2
-    mshrs = 10
+    mshrs = 64
     tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     write_buffers = 16
     # Consider the L2 a victim cache also for clean lines
+    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
     writeback_clean = True
 
 # L2 Cache
@@ -159,7 +161,7 @@ class O3_ARM_Cortex_x4L2(Cache):
     tag_latency = 12
     data_latency = 12
     response_latency = 12
-    mshrs = 32
+    mshrs = 64
     tgts_per_mshr = 16
     size = "1MiB"
     assoc = 8
@@ -167,6 +169,6 @@ class O3_ARM_Cortex_x4L2(Cache):
     writeback_clean = True
     clusivity = "mostly_excl"
     # Simple stride prefetcher
-    #prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
+    prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = LRURP()

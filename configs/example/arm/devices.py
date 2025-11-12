@@ -85,9 +85,10 @@ class L3(Cache):
     tag_latency = 10
     data_latency = 4
     response_latency = 3
-    mshrs = 64
+    mshrs = 128
     tgts_per_mshr = 16
     clusivity = "mostly_excl"
+    prefetcher = StridePrefetcher(degree=16, latency=1, prefetch_on_access=True)
 
 class SLC(Cache):
     size = "16MiB"
@@ -95,10 +96,11 @@ class SLC(Cache):
     tag_latency = 10
     data_latency = 10
     response_latency = 1
-    mshrs = 64
+    mshrs = 256
     tgts_per_mshr = 64
     writeback_clean = True
     clusivity = "mostly_incl"
+    prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
 
 class MemBus(SystemXBar):
     badaddr_responder = BadAddr(warn_access="warn")
@@ -398,7 +400,7 @@ class ClusterSystem:
                 point_of_unification = False,
                 max_outstanding_snoops = 490,
             )
-            self.toL3Bus.snoop_filter = SnoopFilter(lookup_latency=0, max_capacity="6MB")
+            self.toL3Bus.snoop_filter = SnoopFilter(lookup_latency=0, max_capacity="6MiB")
             self.l3.cpu_side = self.toL3Bus.mem_side_ports
             cluster_mem_bus = self.toL3Bus
             # connect each cluster to the memory hierarchy

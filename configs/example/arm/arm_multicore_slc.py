@@ -215,6 +215,7 @@ def createSystem(
 
     sys.realview.setupBootLoader(sys, SysPaths.binary, bootloader)
 
+    sys.exit_on_work_items = True
     return sys
 
 
@@ -632,6 +633,13 @@ def run(options):
                 cpt_dir = os.path.join(options.ckpt_dir, "cpt.%d" % m5.curTick())
                 m5.checkpoint(cpt_dir)
                 print("Checkpoint done.")
+            elif "workbegin" in exit_msg:
+                print("m5 work begin dump and reset")
+                m5.stats.reset()
+            elif "workend" in exit_msg:
+                print("m5 work end dump and reset")
+                m5.stats.dump()
+                m5.stats.reset()
             else:
                 print(exit_msg, " @ ", m5.curTick())
                 break
