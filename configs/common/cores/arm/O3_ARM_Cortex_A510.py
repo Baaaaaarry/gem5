@@ -102,7 +102,7 @@ class O3_ARM_Cortex_A510(ArmO3CPU):
     commitToIEWDelay = 1
     fetchWidth = 4
     fetchBufferSize = 16
-    fetchToDecodeDelay = 1
+    fetchToDecodeDelay = 3
     decodeWidth = 3
     decodeToRenameDelay = 1
     renameWidth = 3
