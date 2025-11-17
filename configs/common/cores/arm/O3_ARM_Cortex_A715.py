@@ -3,12 +3,12 @@ from m5.objects.ArmMMU import ArmMMU
 from m5.proxy import *
 
 # Simple ALU Instructions have a latency of 1
-class O3_ARM_Cortex_x4_Simple_Int(FUDesc):
+class O3_ARM_Cortex_A715_Simple_Int(FUDesc):
     opList = [OpDesc(opClass="IntAlu", opLat=1)]
-    count = 6
+    count = 4
 
 # Complex ALU instructions have a variable latencies
-class O3_ARM_Cortex_x4_Complex_Int(FUDesc):
+class O3_ARM_Cortex_A715_Complex_Int(FUDesc):
     opList = [
         OpDesc(opClass="IntMult", opLat=3, pipelined=True),
         OpDesc(opClass="IntDiv", opLat=12, pipelined=False),
@@ -17,7 +17,7 @@ class O3_ARM_Cortex_x4_Complex_Int(FUDesc):
     count = 2
 
 # Floating point and SIMD instructions
-class O3_ARM_Cortex_x4_FP(FUDesc):
+class O3_ARM_Cortex_A715_FP(FUDesc):
     opList = [
         OpDesc(opClass="FloatAdd", opLat=5),
         OpDesc(opClass="FloatCmp", opLat=5),
@@ -28,38 +28,38 @@ class O3_ARM_Cortex_x4_FP(FUDesc):
         OpDesc(opClass="FloatMultAcc", opLat=5),
         OpDesc(opClass="FloatMisc", opLat=3),
     ]
-    count = 4
+    count = 2
 
-class O3_ARM_Cortex_x4_SIMD(SIMD_Unit):
+class O3_ARM_Cortex_A715_SIMD(SIMD_Unit):
     count = 2
 
 # Load/Store Units
-class O3_ARM_Cortex_x4_Load(FUDesc):
+class O3_ARM_Cortex_A715_Load(FUDesc):
     opList = [
         OpDesc(opClass="MemRead", opLat=2),
         OpDesc(opClass="FloatMemRead", opLat=2),
     ]
     count = 3
 
-class O3_ARM_Cortex_x4_Store(FUDesc):
+class O3_ARM_Cortex_A715_Store(FUDesc):
     opList = [
         OpDesc(opClass="MemWrite", opLat=2),
         OpDesc(opClass="FloatMemWrite", opLat=2),
     ]
-    count = 3
+    count = 1
 
 # Functional Units for this CPU
-class O3_ARM_Cortex_x4_FUP(FUPool):
+class O3_ARM_Cortex_A715_FUP(FUPool):
     FUList = [
-        O3_ARM_Cortex_x4_Simple_Int(),
-        O3_ARM_Cortex_x4_Complex_Int(),
-        O3_ARM_Cortex_x4_Load(),
-        O3_ARM_Cortex_x4_Store(),
-        O3_ARM_Cortex_x4_FP(),
-        O3_ARM_Cortex_x4_SIMD(),
+        O3_ARM_Cortex_A715_Simple_Int(),
+        O3_ARM_Cortex_A715_Complex_Int(),
+        O3_ARM_Cortex_A715_Load(),
+        O3_ARM_Cortex_A715_Store(),
+        O3_ARM_Cortex_A715_FP(),
+        O3_ARM_Cortex_A715_SIMD(),
     ]
 
-class O3_ARM_Cortex_x4_BTB(SimpleBTB):
+class O3_ARM_Cortex_A715_BTB(SimpleBTB):
     numEntries = 8192
     tagBits = 20
     associativity = 4
@@ -73,8 +73,8 @@ class O3_ARM_Cortex_x4_BTB(SimpleBTB):
     )
 
 # Bi-Mode Branch Predictor
-class O3_ARM_Cortex_x4_BP(BiModeBP):
-    btb = O3_ARM_Cortex_x4_BTB()
+class O3_ARM_Cortex_A715_BP(BiModeBP):
+    btb = O3_ARM_Cortex_A715_BTB()
     ras = ReturnAddrStack(numEntries=64)
     globalPredictorSize = 32768
     globalCtrBits = 2
@@ -84,7 +84,7 @@ class O3_ARM_Cortex_x4_BP(BiModeBP):
     # privatePredictorSize = 16384
     # privateCtrBits = 2
 
-class O3_ARM_Cortex_x4(ArmO3CPU):
+class O3_ARM_Cortex_A715(ArmO3CPU):
     LQEntries = 64
     SQEntries = 64
     LSQDepCheckShift = 0
@@ -100,22 +100,22 @@ class O3_ARM_Cortex_x4(ArmO3CPU):
     iewToRenameDelay = 1
     commitToRenameDelay = 1
     commitToIEWDelay = 1
-    fetchWidth = 10
+    fetchWidth = 4
     fetchBufferSize = 64
-    fetchToDecodeDelay = 1
-    decodeWidth = 10
+    fetchToDecodeDelay = 3
+    decodeWidth = 5
     decodeToRenameDelay = 1
-    renameWidth = 10
+    renameWidth = 5
     renameToIEWDelay = 1
     issueToExecuteDelay = 1
-    dispatchWidth = 10
-    issueWidth = 10
-    wbWidth = 10
-    fuPool = O3_ARM_Cortex_x4_FUP()
+    dispatchWidth = 5
+    issueWidth = 5
+    wbWidth = 5
+    fuPool = O3_ARM_Cortex_A715_FUP()
     iewToCommitDelay = 1
     renameToROBDelay = 1
-    commitWidth = 10
-    squashWidth = 10
+    commitWidth = 5
+    squashWidth = 5
     trapLatency = 13
     backComSize = 5
     forwardComSize = 5
@@ -123,52 +123,50 @@ class O3_ARM_Cortex_x4(ArmO3CPU):
     numPhysFloatRegs = 128
     numPhysVecRegs = 128
     numIQEntries = 192
-    numROBEntries = 384
+    numROBEntries = 192
 
     switched_out = False
-    branchPred = O3_ARM_Cortex_x4_BP()
+    branchPred = O3_ARM_Cortex_A715_BP()
 
 # Instruction Cache
-class O3_ARM_Cortex_x4_ICache(Cache):
+class O3_ARM_Cortex_A715_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 20
+    mshrs = 4
     tgts_per_mshr = 8
     size = "64KiB"
     assoc = 4
     is_read_only = True
     # Writeback clean lines as well
-    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
     writeback_clean = True
 
 # Data Cache
-class O3_ARM_Cortex_x4_DCache(Cache):
+class O3_ARM_Cortex_A715_DCache(Cache):
     tag_latency = 2
     data_latency = 2
     response_latency = 2
-    mshrs = 64
+    mshrs = 10
     tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     write_buffers = 16
     # Consider the L2 a victim cache also for clean lines
-    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
     writeback_clean = True
 
 # L2 Cache
-class O3_ARM_Cortex_x4L2(Cache):
+class O3_ARM_Cortex_A715L2(Cache):
     tag_latency = 12
     data_latency = 12
     response_latency = 12
-    mshrs = 64
+    mshrs = 32
     tgts_per_mshr = 16
-    size = "1MiB"
+    size = "512KiB"
     assoc = 8
     write_buffers = 8
-    writeback_clean = True
     clusivity = "mostly_excl"
+    writeback_clean = True
     # Simple stride prefetcher
-    prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
+    #prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = LRURP()

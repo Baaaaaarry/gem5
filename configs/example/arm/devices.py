@@ -80,7 +80,6 @@ class L2(L2Cache):
 
 
 class L3(Cache):
-    size = "8MiB"
     assoc = 16
     tag_latency = 10
     data_latency = 4
@@ -91,7 +90,6 @@ class L3(Cache):
     prefetcher = StridePrefetcher(degree=16, latency=1, prefetch_on_access=True)
 
 class SLC(Cache):
-    size = "16MiB"
     assoc = 16
     tag_latency = 10
     data_latency = 10
@@ -101,6 +99,7 @@ class SLC(Cache):
     writeback_clean = True
     clusivity = "mostly_incl"
     prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
+
 
 class MemBus(SystemXBar):
     badaddr_responder = BadAddr(warn_access="warn")
@@ -370,7 +369,7 @@ class ClusterSystem:
     def addCpuCluster(self, cpu_cluster):
         self._clusters.append(cpu_cluster)
 
-    def addCaches(self, need_caches, last_cache_level):
+    def addCaches(self, need_caches, last_cache_level, l3_size, slc_size):
         if not need_caches:
             # connect each cluster to the memory hierarchy
             for cluster in self._clusters:
@@ -389,6 +388,7 @@ class ClusterSystem:
                 self._clusters, key=lambda c: c.clk_domain.clock[0]
             )
             self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
+            self.l3.size = l3_size
             self.toL3Bus = CoherentXBar(
                 clk_domain = self.clk_domain,
                 frontend_latency = 1,
@@ -400,7 +400,7 @@ class ClusterSystem:
                 point_of_unification = False,
                 max_outstanding_snoops = 490,
             )
-            self.toL3Bus.snoop_filter = SnoopFilter(lookup_latency=0, max_capacity="6MiB")
+            self.toL3Bus.snoop_filter = SnoopFilter(lookup_latency=0, max_capacity="16MiB")
             self.l3.cpu_side = self.toL3Bus.mem_side_ports
             cluster_mem_bus = self.toL3Bus
             # connect each cluster to the memory hierarchy
@@ -421,6 +421,7 @@ class ClusterSystem:
             )
             self.l3.mem_side = self.toSLCBus.cpu_side_ports
             self.slc = SLC()
+            self.slc.size = slc_size
             self.slc.cpu_side = self.toSLCBus.mem_side_ports
             self.slc.mem_side = self.membus.cpu_side_ports
 

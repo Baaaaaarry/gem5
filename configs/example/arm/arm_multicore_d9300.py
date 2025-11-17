@@ -222,7 +222,7 @@ def createSystem(
 cpu_types = {
     "atomic": (AtomicCluster, AtomicCluster),
     "timing": (BigCluster, LittleCluster),
-    "x4a720": (X4BigCluster, A720LittleCluster),
+    "D9300": (X4BigCluster, A720LittleCluster),
 }
 
 # Only add the KVM CPU if it has been compiled into gem5
@@ -303,6 +303,18 @@ def addOptions(parser):
         type=int,
         default=3,
         help="Last level of caches (e.g. 3 for L3)",
+    )
+    parser.add_argument(
+        "--l3-size",
+        type=str,
+        default="8MiB",
+        help="Memory size of L3 Cache",
+    )
+    parser.add_argument(
+        "--slc-size",
+        type=str,
+        default="16MiB",
+        help="Memory size of SLC Cache",
     )
     parser.add_argument(
         "--big-cpu-clock",
@@ -486,7 +498,7 @@ def build(options):
         m5.util.panic("Memory mode missmatch among CPU clusters")
 
     # add L3 & SLC inside
-    system.addCaches(options.caches, options.last_cache_level)
+    system.addCaches(options.caches, options.last_cache_level, options.l3_size, options.slc_size)
 
     # Create a KVM VM and do KVM-specific configuration
     if issubclass(big_model, KvmCluster):
