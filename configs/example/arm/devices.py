@@ -369,13 +369,16 @@ class ClusterSystem:
     def addCpuCluster(self, cpu_cluster):
         self._clusters.append(cpu_cluster)
 
-    def addCaches(self, need_caches, last_cache_level, l3_size, slc_size):
+    def addCaches(self, need_caches, last_cache_level, l3_size=None, slc_size=None):
         if not need_caches:
             # connect each cluster to the memory hierarchy
             for cluster in self._clusters:
                 cluster.connectMemSide(self.membus)
             return
-
+        if l3_size is None:
+            l3_size = 0
+        if slc_size is None:
+            slc_size = 0
         cluster_mem_bus = self.membus
         assert last_cache_level >= 1 and last_cache_level <= 3
         for cluster in self._clusters:
