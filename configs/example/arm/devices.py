@@ -368,6 +368,9 @@ class ClusterSystem:
 
     def addCpuCluster(self, cpu_cluster):
         self._clusters.append(cpu_cluster)
+    
+    def setL3Type(self, l3_type):
+        self._l3_type = l3_type
 
     def addCaches(self, need_caches, last_cache_level, l3_size=None, slc_size=None):
         if not need_caches:
