@@ -123,9 +123,9 @@ class L2PrivCluster(devices.ArmCpuCluster):
             cpu.toL2Bus = CoherentXBar(width=1024,
                                     clk_domain=clk_domain,
                                     frontend_latency=1,
-                                    forward_latency=0,
+                                    forward_latency=1,
                                     response_latency=1,
-                                    header_latency=0,
+                                    header_latency=1,
                                     snoop_response_latency=0)
 
             cpu.connectCachedPorts(cpu.toL2Bus.cpu_side_ports)
