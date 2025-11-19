@@ -181,7 +181,7 @@ class O3_ARM_Cortex_x3L2(Cache):
     response_latency = 6
     mshrs = 16
     tgts_per_mshr = 8
-    size = "8MiB"
+    size = "1MiB"
     assoc = 8
     write_buffers = 8
     clusivity = "mostly_excl"
