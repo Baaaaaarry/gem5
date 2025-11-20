@@ -214,6 +214,65 @@ class ArmCpuCluster(CpuCluster):
             for cpu in self.cpus:
                 cpu.connectCachedPorts(bus.cpu_side_ports)
 
+class ArmCpuClusterWithMonitor(ArmCpuCluster):
+    def addL1(self, options = None):
+        for cpu in self.cpus:
+            l1i = None if self._l1i_type is None else self._l1i_type()
+            l1d = None if self._l1d_type is None else self._l1d_type()
+            cpu.addPrivateSplitL1Caches(l1i, l1d, options = options)
+
+    def addL2(self, clk_domain, options = None):
+        if self._l2_type is None:
+            return
+        self.toL2Bus = L2XBar(width=64, clk_domain=clk_domain)
+        self.l2 = self._l2_type()
+        for cpu in self.cpus:
+            cpu.connectCachedPorts(self.toL2Bus.cpu_side_ports, options = options)
+        self.toL2Bus.mem_side_ports = self.l2.cpu_side
+        self.toL2Bus.point_of_coherency = False
+        self.toL2Bus.point_of_unification = False
+
+    def connectMemSide(self, bus, options = None):
+        opt_l2_monitor = getattr(options, "l2_monitor", False)
+        
+        try:
+            if opt_l2_monitor:
+                self.l2.monitor = CommMonitor()
+                self.l2.monitor.footprint = MemFootprintProbe()
+                self.l2.mem_side = self.l2.monitor.cpu_side_port
+                self.l2.monitor.mem_side_port = bus.cpu_side_ports
+            else:
+                self.l2.mem_side = bus.cpu_side_ports
+        except AttributeError:
+            for cpu in self.cpus:
+                cpu.connectCachedPorts(bus.cpu_side_ports, options = options)
+class L2PrivCluster(ArmCpuClusterWithMonitor):
+
+    def addL2(self, clk_domain, options = None):
+        for cpu in self.cpus:
+            cpu.privL2 = self._l2_type()
+            cpu.toL2Bus = CoherentXBar(width=64,
+                                    clk_domain=clk_domain,
+                                    frontend_latency=1,
+                                    forward_latency=1,
+                                    response_latency=1,
+                                    header_latency=1,
+                                    snoop_response_latency=0)
+
+            cpu.connectCachedPorts(cpu.toL2Bus.cpu_side_ports, options)
+            cpu.toL2Bus.mem_side_ports = cpu.privL2.cpu_side
+
+    def connectMemSide(self, bus, options = None):
+        opt_l2_monitor = getattr(options, "l2_monitor", False)
+        
+        for cpu in self.cpus:
+            if opt_l2_monitor:
+                cpu.privL2.monitor = CommMonitor()
+                cpu.privL2.monitor.footprint = MemFootprintProbe()
+                cpu.privL2.mem_side = cpu.privL2.monitor.cpu_side_port
+                cpu.privL2.monitor.mem_side_port = bus.cpu_side_ports
+            else:
+                cpu.privL2.mem_side = bus.cpu_side_ports      
 
 class AtomicCluster(ArmCpuCluster):
     def __init__(
@@ -372,7 +431,7 @@ class ClusterSystem:
     def setL3Type(self, l3_type):
         self._l3_type = l3_type
 
-    def addCaches(self, need_caches, last_cache_level, l3_size=None, slc_size=None):
+    def addCaches(self, need_caches, last_cache_level, l3_size=None, slc_size=None, options = None):
         if not need_caches:
             # connect each cluster to the memory hierarchy
             for cluster in self._clusters:
@@ -385,10 +444,10 @@ class ClusterSystem:
         cluster_mem_bus = self.membus
         assert last_cache_level >= 1 and last_cache_level <= 3
         for cluster in self._clusters:
-            cluster.addL1()
+            cluster.addL1(options)
         if last_cache_level > 1:
             for cluster in self._clusters:
-                cluster.addL2(cluster.clk_domain)
+                cluster.addL2(cluster.clk_domain, options)
         if last_cache_level > 2:
             max_clock_cluster = max(
                 self._clusters, key=lambda c: c.clk_domain.clock[0]
@@ -411,8 +470,7 @@ class ClusterSystem:
             cluster_mem_bus = self.toL3Bus
             # connect each cluster to the memory hierarchy
             for cluster in self._clusters:
-                cluster.connectMemSide(cluster_mem_bus)
-
+                cluster.connectMemSide(cluster_mem_bus, options)
 
             self.toSLCBus = CoherentXBar(
                 clk_domain = self.clk_domain,
@@ -425,11 +483,27 @@ class ClusterSystem:
                 point_of_unification = False,
                 max_outstanding_snoops = 84
             )
-            self.l3.mem_side = self.toSLCBus.cpu_side_ports
+            opt_l3_monitor = getattr(options, "l3_monitor", False)
+            if opt_l3_monitor:
+                self.l3.monitor = CommMonitor()
+                self.l3.monitor.footprint = MemFootprintProbe()
+                self.l3.mem_side = self.l3.monitor.cpu_side_port
+                self.l3.monitor.mem_side_port = self.toSLCBus.cpu_side_ports
+            else:
+                self.l3.mem_side = self.toSLCBus.cpu_side_ports
+
             self.slc = SLC()
             self.slc.size = slc_size
             self.slc.cpu_side = self.toSLCBus.mem_side_ports
-            self.slc.mem_side = self.membus.cpu_side_ports
+
+            opt_slc_monitor = getattr(options, "slc_monitor", False)
+            if opt_slc_monitor:
+                self.slc.monitor = CommMonitor()
+                self.slc.monitor.footprint = MemFootprintProbe()
+                self.slc.mem_side = self.slc.monitor.cpu_side_port
+                self.slc.monitor.mem_side_port = self.membus.cpu_side_ports
+            else:
+                self.slc.mem_side = self.membus.cpu_side_ports
 
         # set the membus as PoC
         self.membus.point_of_coherency = True

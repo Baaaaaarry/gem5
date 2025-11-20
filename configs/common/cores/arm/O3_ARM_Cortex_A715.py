@@ -1,6 +1,7 @@
 from m5.objects import *
 from m5.objects.ArmMMU import ArmMMU
 from m5.proxy import *
+from .O3_ARM_Monitor import ArmO3CPUWithMonitor
 
 # Simple ALU Instructions have a latency of 1
 class O3_ARM_Cortex_A715_Simple_Int(FUDesc):
@@ -84,7 +85,7 @@ class O3_ARM_Cortex_A715_BP(BiModeBP):
     # privatePredictorSize = 16384
     # privateCtrBits = 2
 
-class O3_ARM_Cortex_A715(ArmO3CPU):
+class O3_ARM_Cortex_A715(ArmO3CPUWithMonitor):
     LQEntries = 64
     SQEntries = 64
     LSQDepCheckShift = 0
