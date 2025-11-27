@@ -143,11 +143,11 @@ class O3_ARM_Cortex_A720_ICache(Cache):
 
 # Data Cache
 class O3_ARM_Cortex_A720_DCache(Cache):
-    tag_latency = 2
-    data_latency = 2
-    response_latency = 2
-    mshrs = 10
-    tgts_per_mshr = 16
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 8
+    tgts_per_mshr = 8
     size = "64KiB"
     assoc = 4
     write_buffers = 16
@@ -156,14 +156,14 @@ class O3_ARM_Cortex_A720_DCache(Cache):
 
 # L2 Cache
 class O3_ARM_Cortex_A720L2(Cache):
-    tag_latency = 12
-    data_latency = 12
-    response_latency = 12
-    mshrs = 32
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 16
     tgts_per_mshr = 16
     size = "512KiB"
     assoc = 8
-    write_buffers = 8
+    write_buffers = 32
     clusivity = "mostly_excl"
     writeback_clean = True
     # Simple stride prefetcher

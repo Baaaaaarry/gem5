@@ -60,8 +60,8 @@ class L1D(L1_DCache):
     tag_latency = 2
     data_latency = 2
     response_latency = 1
-    mshrs = 16
-    tgts_per_mshr = 16
+    mshrs = 10
+    tgts_per_mshr = 8
     size = "32KiB"
     assoc = 2
     write_buffers = 16
@@ -71,8 +71,8 @@ class L2(L2Cache):
     tag_latency = 12
     data_latency = 12
     response_latency = 5
-    mshrs = 32
-    tgts_per_mshr = 8
+    mshrs = 24
+    tgts_per_mshr = 16
     size = "1MiB"
     assoc = 16
     write_buffers = 8
@@ -81,24 +81,26 @@ class L2(L2Cache):
 
 class L3(Cache):
     assoc = 16
-    tag_latency = 10
-    data_latency = 4
-    response_latency = 3
-    mshrs = 128
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 48
     tgts_per_mshr = 16
+    write_buffers = 64
     clusivity = "mostly_excl"
     prefetcher = StridePrefetcher(degree=16, latency=1, prefetch_on_access=True)
 
 class SLC(Cache):
     assoc = 16
-    tag_latency = 10
-    data_latency = 10
+    tag_latency = 1
+    data_latency = 1
     response_latency = 1
-    mshrs = 256
-    tgts_per_mshr = 64
+    mshrs = 64
+    tgts_per_mshr = 16
+    write_buffers = 64
     writeback_clean = True
     clusivity = "mostly_incl"
-    prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
+    prefetcher = StridePrefetcher(degree=16, latency=1, prefetch_on_access=True)
 
 
 class MemBus(SystemXBar):
@@ -396,9 +398,9 @@ class ClusterSystem:
             self.l3 = L3(clk_domain=max_clock_cluster.clk_domain)
             self.l3.size = l3_size
             self.toL3Bus = CoherentXBar(
-                clk_domain = self.clk_domain,
+                clk_domain = max_clock_cluster.clk_domain,
                 frontend_latency = 1,
-                forward_latency = 1,
+                forward_latency = 0,
                 response_latency = 1,
                 snoop_response_latency = 1,
                 width = 128,
@@ -415,10 +417,10 @@ class ClusterSystem:
 
 
             self.toSLCBus = CoherentXBar(
-                clk_domain = self.clk_domain,
-                frontend_latency = 3,
-                forward_latency = 1,
-                response_latency = 3,
+                clk_domain = max_clock_cluster.clk_domain,
+                frontend_latency = 1,
+                forward_latency = 0,
+                response_latency = 1,
                 snoop_response_latency = 1,
                 width = 128,
                 point_of_coherency = False,

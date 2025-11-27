@@ -124,10 +124,9 @@ class L2PrivCluster(devices.ArmCpuCluster):
             cpu.toL2Bus = CoherentXBar(width=64,
                                     clk_domain=clk_domain,
                                     frontend_latency=1,
-                                    forward_latency=1,
+                                    forward_latency=0,
                                     response_latency=1,
-                                    header_latency=1,
-                                    snoop_response_latency=0)
+                                    snoop_response_latency=1)
 
             cpu.connectCachedPorts(cpu.toL2Bus.cpu_side_ports)
             cpu.toL2Bus.mem_side_ports = cpu.privL2.cpu_side
@@ -182,10 +181,10 @@ class A510SmallCluster(devices.ArmCpuCluster):
 class L3Cache(Cache):
     size = "10MiB"
     assoc = 16
-    tag_latency = 10
-    data_latency = 4
-    response_latency = 3
-    mshrs = 32
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 48
     tgts_per_mshr = 16
     writeback_clean = True
     clusivity = "mostly_incl"
