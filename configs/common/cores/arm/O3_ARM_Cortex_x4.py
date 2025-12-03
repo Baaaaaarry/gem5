@@ -75,7 +75,7 @@ class O3_ARM_Cortex_x4_BTB(SimpleBTB):
 # Bi-Mode Branch Predictor
 class O3_ARM_Cortex_x4_BP(BiModeBP):
     btb = O3_ARM_Cortex_x4_BTB()
-    ras = ReturnAddrStack(numEntries=64)
+    ras = ReturnAddrStack(numEntries=32)
     globalPredictorSize = 32768
     globalCtrBits = 2
     choicePredictorSize = 32768

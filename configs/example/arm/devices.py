@@ -86,9 +86,9 @@ class L3(Cache):
     response_latency = 1
     mshrs = 48
     tgts_per_mshr = 16
-    write_buffers = 64
+    write_buffers = 32
     clusivity = "mostly_excl"
-    prefetcher = StridePrefetcher(degree=16, latency=1, prefetch_on_access=True)
+    prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
 
 class SLC(Cache):
     assoc = 16
@@ -100,7 +100,7 @@ class SLC(Cache):
     write_buffers = 64
     writeback_clean = True
     clusivity = "mostly_incl"
-    prefetcher = StridePrefetcher(degree=16, latency=1, prefetch_on_access=True)
+    prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
 
 
 class MemBus(SystemXBar):

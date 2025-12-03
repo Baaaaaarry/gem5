@@ -145,6 +145,16 @@ class X4BigCluster(L2PrivCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
+class X4MiddleCluster(L2PrivCluster):
+    def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
+        cpu_config = [
+            ObjectList.cpu_list.get("O3_ARM_Cortex_x4"),
+            x4_core.O3_ARM_Cortex_x4_ICache,
+            x4_core.O3_ARM_Cortex_x4_DCache,
+            x4_core.O3_ARM_Cortex_x4L2,
+        ]
+        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
+
 class A720LittleCluster(L2PrivCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
@@ -221,7 +231,7 @@ def createSystem(
 cpu_types = {
     "atomic": (AtomicCluster, AtomicCluster),
     "timing": (BigCluster, LittleCluster),
-    "D9300": (X4BigCluster, A720LittleCluster),
+    "D9300": (X4BigCluster, X4MiddleCluster, A720LittleCluster),
 }
 
 # Only add the KVM CPU if it has been compiled into gem5
@@ -282,8 +292,14 @@ def addOptions(parser):
     parser.add_argument(
         "--big-cpus",
         type=int,
-        default=4,
+        default=1,
         help="Number of big CPUs to instantiate",
+    )
+    parser.add_argument(
+        "--middle-cpus",
+        type=int,
+        default=3,
+        help="Number of middle CPUs to instantiate",
     )
     parser.add_argument(
         "--little-cpus",
@@ -318,7 +334,13 @@ def addOptions(parser):
     parser.add_argument(
         "--big-cpu-clock",
         type=str,
-        default="3.4GHz",
+        default="3.25GHz",
+        help="Big CPU clock frequency",
+    )
+    parser.add_argument(
+        "--middle-cpu-clock",
+        type=str,
+        default="2.85GHz",
         help="Big CPU clock frequency",
     )
     parser.add_argument(
@@ -465,10 +487,10 @@ def build(options):
     else:
         system.workload.command_line = " ".join(kernel_cmd)
 
-    if options.big_cpus + options.little_cpus == 0:
+    if options.big_cpus + options.middle_cpus + options.little_cpus == 0:
         m5.util.panic("Empty CPU clusters")
 
-    big_model, little_model = cpu_types[options.cpu_type]
+    big_model, middle_model, little_model = cpu_types[options.cpu_type]
 
     all_cpus = []
     # big cluster
@@ -478,6 +500,14 @@ def build(options):
         )
         system.mem_mode = system.bigCluster.memory_mode()
         all_cpus += system.bigCluster.cpus
+
+    # middle cluster
+    if options.middle_cpus > 0:
+        system.middleCluster = middle_model(
+            system, options.middle_cpus, options.middle_cpu_clock
+        )
+        system.mem_mode = system.middleCluster.memory_mode()
+        all_cpus += system.middleCluster.cpus
 
     # little cluster
     if options.little_cpus > 0:
@@ -490,8 +520,11 @@ def build(options):
     # Figure out the memory mode
     if (
         options.big_cpus > 0
+        and options.middle_cpus > 0
         and options.little_cpus > 0
         and system.bigCluster.memory_mode()
+        != system.middleCluster.memory_mode()
+        or system.bigCluster.memory_mode()
         != system.littleCluster.memory_mode()
     ):
         m5.util.panic("Memory mode missmatch among CPU clusters")
