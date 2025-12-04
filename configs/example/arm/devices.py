@@ -444,10 +444,16 @@ class ClusterSystem:
         cluster_mem_bus = self.membus
         assert last_cache_level >= 1 and last_cache_level <= 3
         for cluster in self._clusters:
-            cluster.addL1(options)
+            if issubclass(type(cluster), ArmCpuClusterWithMonitor):
+                cluster.addL1(options)
+            else:
+                cluster.addL1()
         if last_cache_level > 1:
             for cluster in self._clusters:
-                cluster.addL2(cluster.clk_domain, options)
+                if issubclass(type(cluster), ArmCpuClusterWithMonitor):
+                    cluster.addL2(cluster.clk_domain, options)
+                else:
+                    cluster.addL2(cluster.clk_domain)
         if last_cache_level > 2:
             max_clock_cluster = max(
                 self._clusters, key=lambda c: c.clk_domain.clock[0]
@@ -470,7 +476,10 @@ class ClusterSystem:
             cluster_mem_bus = self.toL3Bus
             # connect each cluster to the memory hierarchy
             for cluster in self._clusters:
-                cluster.connectMemSide(cluster_mem_bus, options)
+                if issubclass(type(cluster), ArmCpuClusterWithMonitor):
+                    cluster.connectMemSide(cluster_mem_bus, options)
+                else:
+                    cluster.connectMemSide(cluster_mem_bus)
 
             self.toSLCBus = CoherentXBar(
                 clk_domain = self.clk_domain,

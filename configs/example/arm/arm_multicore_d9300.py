@@ -320,7 +320,7 @@ def addOptions(parser):
     )
     parser.add_argument(
         "--mem-type",
-        default="LPDDR5_6400_1x16_BG_BL32",
+        default="LPDDR5_8533_1x16_BG_BL32",
         choices=ObjectList.mem_list.get_names(),
         help="type of memory to use",
     )
@@ -419,6 +419,12 @@ def addOptions(parser):
         action="store_true",
         default=False,
         help="add mem monitor to out port of l2"
+    )
+    parser.add_argument(
+        "--l3-monitor",
+        action="store_true",
+        default=False,
+        help="add mem monitor to out port of l3"
     )
     parser.add_argument(
         "--slc-monitor",
