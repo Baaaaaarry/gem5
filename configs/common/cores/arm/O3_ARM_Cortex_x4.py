@@ -11,23 +11,23 @@ class O3_ARM_Cortex_x4_Simple_Int(FUDesc):
 # Complex ALU instructions have a variable latencies
 class O3_ARM_Cortex_x4_Complex_Int(FUDesc):
     opList = [
-        OpDesc(opClass="IntMult", opLat=3, pipelined=True),
+        OpDesc(opClass="IntMult", opLat=2, pipelined=True),
         OpDesc(opClass="IntDiv", opLat=12, pipelined=False),
-        OpDesc(opClass="IprAccess", opLat=3, pipelined=True),
+        OpDesc(opClass="IprAccess", opLat=2, pipelined=True),
     ]
     count = 2
 
 # Floating point and SIMD instructions
 class O3_ARM_Cortex_x4_FP(FUDesc):
     opList = [
-        OpDesc(opClass="FloatAdd", opLat=5),
-        OpDesc(opClass="FloatCmp", opLat=5),
-        OpDesc(opClass="FloatCvt", opLat=5),
-        OpDesc(opClass="FloatDiv", opLat=9, pipelined=False),
-        OpDesc(opClass="FloatSqrt", opLat=33, pipelined=False),
-        OpDesc(opClass="FloatMult", opLat=4),
-        OpDesc(opClass="FloatMultAcc", opLat=5),
-        OpDesc(opClass="FloatMisc", opLat=3),
+        OpDesc(opClass="FloatAdd", opLat=2),
+        OpDesc(opClass="FloatCmp", opLat=2),
+        OpDesc(opClass="FloatCvt", opLat=2),
+        OpDesc(opClass="FloatDiv", opLat=6, pipelined=False),
+        OpDesc(opClass="FloatSqrt", opLat=13, pipelined=False),
+        OpDesc(opClass="FloatMult", opLat=3),
+        OpDesc(opClass="FloatMultAcc", opLat=4),
+        OpDesc(opClass="FloatMisc", opLat=2),
     ]
     count = 4
 
@@ -76,7 +76,7 @@ class O3_ARM_Cortex_x4_BTB(SimpleBTB):
 # Bi-Mode Branch Predictor
 class O3_ARM_Cortex_x4_BP(BiModeBP):
     btb = O3_ARM_Cortex_x4_BTB()
-    ras = ReturnAddrStack(numEntries=64)
+    ras = ReturnAddrStack(numEntries=32)
     globalPredictorSize = 32768
     globalCtrBits = 2
     choicePredictorSize = 32768
@@ -86,7 +86,7 @@ class O3_ARM_Cortex_x4_BP(BiModeBP):
     # privateCtrBits = 2
 
 class O3_ARM_Cortex_x4(ArmO3CPUWithMonitor):
-    LQEntries = 64
+    LQEntries = 128
     SQEntries = 64
     LSQDepCheckShift = 0
     LFSTSize = 1024
@@ -103,7 +103,7 @@ class O3_ARM_Cortex_x4(ArmO3CPUWithMonitor):
     commitToIEWDelay = 1
     fetchWidth = 10
     fetchBufferSize = 64
-    fetchToDecodeDelay = 3
+    fetchToDecodeDelay = 1
     decodeWidth = 10
     decodeToRenameDelay = 1
     renameWidth = 10
@@ -117,25 +117,34 @@ class O3_ARM_Cortex_x4(ArmO3CPUWithMonitor):
     renameToROBDelay = 1
     commitWidth = 10
     squashWidth = 10
-    trapLatency = 13
+    trapLatency = 5
     backComSize = 5
     forwardComSize = 5
-    numPhysIntRegs = 192
-    numPhysFloatRegs = 128
-    numPhysVecRegs = 128
-    numIQEntries = 192
+    numPhysIntRegs = 256
+    numPhysFloatRegs = 256
+    numPhysVecRegs = 256
+    numIQEntries = 256
     numROBEntries = 384
 
     switched_out = False
     branchPred = O3_ARM_Cortex_x4_BP()
+    mmu = ArmMMU(
+        l2_shared=ArmTLB(
+            entry_type="unified", size=2048, assoc=4, partial_levels=["L2"]
+        ),
+        itb=ArmTLB(
+            entry_type="instruction", size=48, next_level=Parent.l2_shared
+        ),
+        dtb=ArmTLB(entry_type="data", size=48, next_level=Parent.l2_shared),
+    )
 
 # Instruction Cache
 class O3_ARM_Cortex_x4_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 20
-    tgts_per_mshr = 8
+    mshrs = 32
+    tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     is_read_only = True
@@ -145,10 +154,10 @@ class O3_ARM_Cortex_x4_ICache(Cache):
 
 # Data Cache
 class O3_ARM_Cortex_x4_DCache(Cache):
-    tag_latency = 2
-    data_latency = 2
-    response_latency = 2
-    mshrs = 64
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 32
     tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
@@ -159,14 +168,14 @@ class O3_ARM_Cortex_x4_DCache(Cache):
 
 # L2 Cache
 class O3_ARM_Cortex_x4L2(Cache):
-    tag_latency = 12
-    data_latency = 12
-    response_latency = 12
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
     mshrs = 64
     tgts_per_mshr = 16
     size = "1MiB"
     assoc = 8
-    write_buffers = 8
+    write_buffers = 32
     writeback_clean = True
     clusivity = "mostly_excl"
     # Simple stride prefetcher

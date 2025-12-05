@@ -12,9 +12,9 @@ class O3_ARM_Cortex_x3_Simple_Int(FUDesc):
 # Complex ALU instructions have a variable latencies
 class O3_ARM_Cortex_x3_Complex_Int(FUDesc):
     opList = [
-        OpDesc(opClass="IntMult", opLat=3, pipelined=True),
+        OpDesc(opClass="IntMult", opLat=2, pipelined=True),
         OpDesc(opClass="IntDiv", opLat=12, pipelined=False),
-        OpDesc(opClass="IprAccess", opLat=3, pipelined=True),
+        OpDesc(opClass="IprAccess", opLat=2, pipelined=True),
     ]
     count = 2
 
@@ -22,14 +22,14 @@ class O3_ARM_Cortex_x3_Complex_Int(FUDesc):
 # Floating point and SIMD instructions
 class O3_ARM_Cortex_x3_FP(FUDesc):
     opList = [
-        OpDesc(opClass="FloatAdd", opLat=5),
-        OpDesc(opClass="FloatCmp", opLat=5),
-        OpDesc(opClass="FloatCvt", opLat=5),
-        OpDesc(opClass="FloatDiv", opLat=9, pipelined=False),
-        OpDesc(opClass="FloatSqrt", opLat=33, pipelined=False),
-        OpDesc(opClass="FloatMult", opLat=4),
-        OpDesc(opClass="FloatMultAcc", opLat=5),
-        OpDesc(opClass="FloatMisc", opLat=3),
+        OpDesc(opClass="FloatAdd", opLat=2),
+        OpDesc(opClass="FloatCmp", opLat=2),
+        OpDesc(opClass="FloatCvt", opLat=2),
+        OpDesc(opClass="FloatDiv", opLat=6, pipelined=False),
+        OpDesc(opClass="FloatSqrt", opLat=13, pipelined=False),
+        OpDesc(opClass="FloatMult", opLat=2),
+        OpDesc(opClass="FloatMultAcc", opLat=4),
+        OpDesc(opClass="FloatMisc", opLat=2),
 
     ]
     count = 4
@@ -67,9 +67,9 @@ class O3_ARM_Cortex_x3_FUP(FUPool):
 
 
 class O3_ARM_Cortex_x3_BTB(SimpleBTB):
-    numEntries = 4096
-    tagBits = 18
-    associativity = 2
+    numEntries = 8192
+    tagBits = 20
+    associativity = 4
     instShiftAmt = 2
     btbReplPolicy = LRURP()
     btbIndexingPolicy = BTBSetAssociative(
@@ -84,16 +84,16 @@ class O3_ARM_Cortex_x3_BTB(SimpleBTB):
 class O3_ARM_Cortex_x3_BP(BiModeBP):
     btb = O3_ARM_Cortex_x3_BTB()
     ras = ReturnAddrStack(numEntries=32)
-    globalPredictorSize = 16384
+    globalPredictorSize = 32768
     globalCtrBits = 2
-    choicePredictorSize = 16384
+    choicePredictorSize = 32768
     choiceCtrBits = 2
     instShiftAmt = 2
 
 
 class O3_ARM_Cortex_x3(ArmO3CPUWithMonitor):
-    LQEntries = 16
-    SQEntries = 16
+    LQEntries = 128
+    SQEntries = 64
     LSQDepCheckShift = 0
     LFSTSize = 1024
     SSITSize = "1024"
@@ -108,8 +108,8 @@ class O3_ARM_Cortex_x3(ArmO3CPUWithMonitor):
     commitToRenameDelay = 1
     commitToIEWDelay = 1
     fetchWidth = 6
-    fetchBufferSize = 16
-    fetchToDecodeDelay = 3
+    fetchBufferSize = 32
+    fetchToDecodeDelay = 1
     decodeWidth = 6
     decodeToRenameDelay = 1
     renameWidth = 8
@@ -123,13 +123,13 @@ class O3_ARM_Cortex_x3(ArmO3CPUWithMonitor):
     renameToROBDelay = 1
     commitWidth = 8
     squashWidth = 8
-    trapLatency = 13
+    trapLatency = 5
     backComSize = 5
     forwardComSize = 5
-    numPhysIntRegs = 128
-    numPhysFloatRegs = 192
-    numPhysVecRegs = 48
-    numIQEntries = 32
+    numPhysIntRegs = 256
+    numPhysFloatRegs = 128
+    numPhysVecRegs = 128
+    numIQEntries = 256
     numROBEntries = 320
 
     switched_out = False
@@ -151,52 +151,45 @@ class O3_ARM_Cortex_x3_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 2
+    mshrs = 6
     tgts_per_mshr = 8
     size = "64KiB"
     assoc = 4
     is_read_only = True
+    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
     # Writeback clean lines as well
     writeback_clean = True
 
 
 # Data Cache
 class O3_ARM_Cortex_x3_DCache(Cache):
-    tag_latency = 2
-    data_latency = 2
-    response_latency = 2
-    mshrs = 6
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 10
     tgts_per_mshr = 8
     size = "64KiB"
     assoc = 4
     write_buffers = 16
+    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
     # Consider the L2 a victim cache also for clean lines
     writeback_clean = True
 
 
 # L2 Cache
 class O3_ARM_Cortex_x3L2(Cache):
-    tag_latency = 6
-    data_latency = 6
-    response_latency = 6
-    mshrs = 16
-    tgts_per_mshr = 8
+    tag_latency = 1
+    data_latency = 1
+    response_latency = 1
+    mshrs = 24
+    tgts_per_mshr = 16
     size = "1MiB"
     assoc = 8
-    write_buffers = 8
+    write_buffers = 32
+    writeback_clean = True
     clusivity = "mostly_excl"
     # Simple stride prefetcher
     prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = RandomRP()
 
-class O3_ARM_Cortex_x3_L3(Cache):
-    size = "32MiB"
-    assoc = 16
-    tag_latency = 7
-    data_latency = 7
-    response_latency = 7
-    mshrs = 20
-    tgts_per_mshr = 12
-    write_buffers = 16
-    clusivity = "mostly_excl"
