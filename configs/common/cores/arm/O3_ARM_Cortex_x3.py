@@ -1,7 +1,7 @@
 from m5.objects import *
 from m5.objects.ArmMMU import ArmMMU
 from m5.proxy import *
-
+from .O3_ARM_Monitor import ArmO3CPUWithMonitor
 
 # Simple ALU Instructions have a latency of 1
 class O3_ARM_Cortex_x3_Simple_Int(FUDesc):
@@ -90,7 +90,8 @@ class O3_ARM_Cortex_x3_BP(BiModeBP):
     choiceCtrBits = 2
     instShiftAmt = 2
 
-class O3_ARM_Cortex_x3(ArmO3CPU):
+
+class O3_ARM_Cortex_x3(ArmO3CPUWithMonitor):
     LQEntries = 128
     SQEntries = 64
     LSQDepCheckShift = 0
@@ -150,8 +151,8 @@ class O3_ARM_Cortex_x3_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 6
-    tgts_per_mshr = 8
+    mshrs = 32
+    tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     is_read_only = True
@@ -165,8 +166,8 @@ class O3_ARM_Cortex_x3_DCache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 10
-    tgts_per_mshr = 8
+    mshrs = 32
+    tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     write_buffers = 16
@@ -180,7 +181,7 @@ class O3_ARM_Cortex_x3L2(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 24
+    mshrs = 64
     tgts_per_mshr = 16
     size = "1MiB"
     assoc = 8
@@ -191,3 +192,4 @@ class O3_ARM_Cortex_x3L2(Cache):
     prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
     tags = BaseSetAssoc()
     replacement_policy = LRURP()
+

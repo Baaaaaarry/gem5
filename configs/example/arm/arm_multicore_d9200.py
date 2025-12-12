@@ -114,29 +114,7 @@ class LittleCluster(devices.ArmCpuCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
-
-class L2PrivCluster(devices.ArmCpuCluster):
-
-    def addL2(self, clk_domain):
-        print("run in L2PrivCluster addL2")
-        for cpu in self.cpus:
-            cpu.privL2 = self._l2_type()
-            cpu.toL2Bus = CoherentXBar(width=64,
-                                    clk_domain=clk_domain,
-                                    frontend_latency=1,
-                                    forward_latency=0,
-                                    response_latency=1,
-                                    snoop_response_latency=1)
-
-            cpu.connectCachedPorts(cpu.toL2Bus.cpu_side_ports)
-            cpu.toL2Bus.mem_side_ports = cpu.privL2.cpu_side
-
-    def connectMemSide(self, bus):
-        print("run in L2PrivCluster connectMemSide")
-        for cpu in self.cpus:
-            cpu.privL2.mem_side = bus.cpu_side_ports
-
-class X3BigCluster(L2PrivCluster):
+class X3BigCluster(devices.L2PrivCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("O3_ARM_Cortex_x3"),
@@ -146,7 +124,7 @@ class X3BigCluster(L2PrivCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
-class A715MiddleCluster(L2PrivCluster):
+class A715MiddleCluster(devices.L2PrivCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("O3_ARM_Cortex_A715"),
@@ -157,7 +135,7 @@ class A715MiddleCluster(L2PrivCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
-class A510LittleCluster(devices.ArmCpuCluster):
+class A510LittleCluster(devices.ArmCpuClusterWithMonitor):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
             ObjectList.cpu_list.get("O3_ARM_Cortex_A510"),
@@ -231,7 +209,7 @@ def createSystem(
 
 
 cpu_types = {
-    "atomic": (AtomicCluster, AtomicCluster),
+    "atomic": (AtomicCluster, AtomicCluster, AtomicCluster),
     "timing": (BigCluster, LittleCluster),
     "D9200": (X3BigCluster, A715MiddleCluster, A510LittleCluster)
 }
@@ -301,7 +279,7 @@ def addOptions(parser):
         "--middle-cpus",
         type=int,
         default=3,
-        help="Number of midlle CPUs to instantiate",
+        help="Number of middle CPUs to instantiate",
     )
     parser.add_argument(
         "--little-cpus",
@@ -330,7 +308,7 @@ def addOptions(parser):
     parser.add_argument(
         "--slc-size",
         type=str,
-        default="8MiB",
+        default="16MiB",
         help="Memory size of SLC Cache",
     )
     parser.add_argument(
@@ -366,7 +344,7 @@ def addOptions(parser):
     )
     parser.add_argument(
         "--mem-type",
-        default="LPDDR5_6400_1x16_BG_BL32",
+        default="LPDDR5_8533_1x16_BG_BL32",
         choices=ObjectList.mem_list.get_names(),
         help="type of memory to use",
     )
@@ -447,6 +425,36 @@ def addOptions(parser):
         "--ckpt-dir",
         type=str,
         default=os.path.abspath(os.path.join(m5.options.outdir, "ckpts")),
+    )
+    parser.add_argument(
+        "--cpu-monitor",
+        action="store_true",
+        default=False,
+        help="add mem monitor to out port of cpu"
+    )
+    parser.add_argument(
+        "--l1-monitor",
+        action="store_true",
+        default=False,
+        help="add mem monitor to out port of l1"
+    )
+    parser.add_argument(
+        "--l2-monitor",
+        action="store_true",
+        default=False,
+        help="add mem monitor to out port of l2"
+    )
+    parser.add_argument(
+        "--l3-monitor",
+        action="store_true",
+        default=False,
+        help="add mem monitor to out port of l3"
+    )
+    parser.add_argument(
+        "--slc-monitor",
+        action="store_true",
+        default=False,
+        help="add mem monitor to out port of slc"
     )
     return parser
 
@@ -532,7 +540,7 @@ def build(options):
         m5.util.panic("Memory mode missmatch among CPU clusters")
 
     # add L3 & SLC inside
-    system.addCaches(options.caches, options.last_cache_level, options.l3_size, options.slc_size)
+    system.addCaches(options.caches, options.last_cache_level, options.l3_size, options.slc_size, options=options)
 
     # Create a KVM VM and do KVM-specific configuration
     if issubclass(big_model, KvmCluster):

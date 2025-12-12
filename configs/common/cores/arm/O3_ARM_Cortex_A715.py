@@ -1,6 +1,7 @@
 from m5.objects import *
 from m5.objects.ArmMMU import ArmMMU
 from m5.proxy import *
+from .O3_ARM_Monitor import ArmO3CPUWithMonitor
 
 # Simple ALU Instructions have a latency of 1
 class O3_ARM_Cortex_A715_Simple_Int(FUDesc):
@@ -22,8 +23,8 @@ class O3_ARM_Cortex_A715_FP(FUDesc):
         OpDesc(opClass="FloatAdd", opLat=2),
         OpDesc(opClass="FloatCmp", opLat=2),
         OpDesc(opClass="FloatCvt", opLat=2),
-        OpDesc(opClass="FloatDiv", opLat=7, pipelined=True),
-        OpDesc(opClass="FloatSqrt", opLat=13, pipelined=True),
+        OpDesc(opClass="FloatDiv", opLat=7, pipelined=False),
+        OpDesc(opClass="FloatSqrt", opLat=13, pipelined=False),
         OpDesc(opClass="FloatMult", opLat=3),
         OpDesc(opClass="FloatMultAcc", opLat=4),
         OpDesc(opClass="FloatMisc", opLat=2),
@@ -84,7 +85,7 @@ class O3_ARM_Cortex_A715_BP(BiModeBP):
     # privatePredictorSize = 16384
     # privateCtrBits = 2
 
-class O3_ARM_Cortex_A715(ArmO3CPU):
+class O3_ARM_Cortex_A715(ArmO3CPUWithMonitor):
     LQEntries = 64
     SQEntries = 64
     LSQDepCheckShift = 0
@@ -141,8 +142,8 @@ class O3_ARM_Cortex_A715_ICache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 4
-    tgts_per_mshr = 8
+    mshrs = 16
+    tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     is_read_only = True
@@ -155,8 +156,8 @@ class O3_ARM_Cortex_A715_DCache(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 8
-    tgts_per_mshr = 8
+    mshrs = 16
+    tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
     write_buffers = 16
@@ -169,7 +170,7 @@ class O3_ARM_Cortex_A715L2(Cache):
     tag_latency = 1
     data_latency = 1
     response_latency = 1
-    mshrs = 16
+    mshrs = 32
     tgts_per_mshr = 16
     size = "256KiB"
     assoc = 8

@@ -102,16 +102,6 @@ class BigCluster(devices.ArmCpuCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
-class X4MiddleCluster(devices.L2PrivCluster):
-    def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
-        cpu_config = [
-            ObjectList.cpu_list.get("O3_ARM_Cortex_x4"),
-            x4_core.O3_ARM_Cortex_x4_ICache,
-            x4_core.O3_ARM_Cortex_x4_DCache,
-            x4_core.O3_ARM_Cortex_x4L2,
-        ]
-        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
-
 class LittleCluster(devices.ArmCpuCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
@@ -132,6 +122,17 @@ class X4BigCluster(devices.L2PrivCluster):
         ]
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
+class A720MiddleCluster(devices.L2PrivCluster):
+    def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
+        cpu_config = [
+            ObjectList.cpu_list.get("O3_ARM_Cortex_A720"),
+            a720_core.O3_ARM_Cortex_A720_ICache,
+            a720_core.O3_ARM_Cortex_A720_DCache,
+            a720_core.O3_ARM_Cortex_A720L2,
+
+        ]
+        super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
+
 class A720LittleCluster(devices.L2PrivCluster):
     def __init__(self, system, num_cpus, cpu_clock, cpu_voltage="1.0V"):
         cpu_config = [
@@ -144,7 +145,7 @@ class A720LittleCluster(devices.L2PrivCluster):
         super().__init__(system, num_cpus, cpu_clock, cpu_voltage, *cpu_config)
 
 class L3Cache(Cache):
-    size = "10MiB"
+    size = "8MiB"
     assoc = 16
     tag_latency = 1
     data_latency = 1
@@ -208,7 +209,7 @@ def createSystem(
 cpu_types = {
     "atomic": (AtomicCluster, AtomicCluster, AtomicCluster),
     "timing": (BigCluster, LittleCluster),
-    "D9300": (X4BigCluster, X4MiddleCluster, A720LittleCluster),
+    "Heng": (X4BigCluster, A720MiddleCluster, A720LittleCluster),
 }
 
 # Only add the KVM CPU if it has been compiled into gem5
@@ -269,19 +270,19 @@ def addOptions(parser):
     parser.add_argument(
         "--big-cpus",
         type=int,
-        default=1,
+        default=2,
         help="Number of big CPUs to instantiate",
     )
     parser.add_argument(
         "--middle-cpus",
         type=int,
-        default=3,
+        default=4,
         help="Number of middle CPUs to instantiate",
     )
     parser.add_argument(
         "--little-cpus",
         type=int,
-        default=4,
+        default=2,
         help="Number of little CPUs to instantiate",
     )
     parser.add_argument(
@@ -305,25 +306,25 @@ def addOptions(parser):
     parser.add_argument(
         "--slc-size",
         type=str,
-        default="16MiB",
+        default="8MiB",
         help="Memory size of SLC Cache",
     )
     parser.add_argument(
         "--big-cpu-clock",
         type=str,
-        default="3.25GHz",
+        default="3.3GHz",
         help="Big CPU clock frequency",
     )
     parser.add_argument(
         "--middle-cpu-clock",
         type=str,
-        default="2.85GHz",
+        default="2.9GHz",
         help="Big CPU clock frequency",
      )
     parser.add_argument(
         "--little-cpu-clock",
         type=str,
-        default="2.0GHz",
+        default="1.8GHz",
         help="Little CPU clock frequency",
     )
     parser.add_argument(

@@ -112,6 +112,17 @@ m5 checkpoint
 # cpt.7368810596684 is the checkpoint file name in m5out folder
 $gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/starter_fs_x3.py --restore=$gem5_home/m5out/cpt.7368810596684 --cpu="o3"  --num-cores=1 --disk-image=${M5_PATH}/ubuntu-18.04-arm64-docker.img --root-device=/dev/vda1
 ```
+
+## memory monitor
+--cpu-monitor         add mem monitor to out port of cpu
+--l1-monitor          add mem monitor to out port of l1
+--l2-monitor          add mem monitor to out port of l2
+--slc-monitor         add mem monitor to out port of slc
+
+```bash
+$gem5_home/build/ARM/gem5.fast $gem5_home/configs/example/arm/arm_multicore_d9200.py --disk=${M5_PATH}/ubuntu-18.04-arm64-docker.img --kernel=${M5_PATH}/binaries/vmlinux.arm64 --caches --last-cache-level 3 --cpu-type="D9200" --bootscript=$gem5_home/my_test/run_scripts/gb_204.sh --cpu-monitor --l1-monitor --l2-monitor --slc-monitor
+```
+
 ## BUGFIX LIST
 1、增加定时保存和恢复断点功能：7431c4bb836bc9c2d224fae5d211017bda52233b
 2、多核一致性实现按照CHI协议修改：2fe92e4c477e07bcb9957fee2aa3859177377abc
