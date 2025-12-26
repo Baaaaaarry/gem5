@@ -1822,7 +1822,7 @@ class LPDDR5_8533_1x16_BG_BL32(LPDDR5_6400_1x16_BG_BL32):
     tCK = "0.9375ns"
 
     # Base RL is 20 CK @ 1066.67 MHz = 18.75ns
-    tCL = "18.75ns"
+    tCL = "15.9375ns"
 
     # With BG architecture, burst of 32 transferred in two 16-beat
     # sub-bursts, with a 16-beat gap in between.
@@ -1855,6 +1855,13 @@ class LPDDR5_8533_1x16_BG_BL32(LPDDR5_6400_1x16_BG_BL32):
     # with a gap up to tAAD = 8 CK
     tAAD = "7.5ns"
 
+    tRP = "12ns"
+    tRCD = "13ns"
+
+    addr_mapping = "RoCoRaBaCh"
+
+    page_policy="open_adaptive"
+    
     # 为了支持4通道x16位配置实现68.2GB/s带宽，以下是系统级配置指南:
     #
     # 在系统配置文件中使用此接口时，应创建4个LPDDR5_8533_1x16_BG_BL32实例

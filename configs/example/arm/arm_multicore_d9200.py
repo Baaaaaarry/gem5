@@ -308,13 +308,13 @@ def addOptions(parser):
     parser.add_argument(
         "--slc-size",
         type=str,
-        default="16MiB",
+        default="8MiB",
         help="Memory size of SLC Cache",
     )
     parser.add_argument(
         "--big-cpu-clock",
         type=str,
-        default="3.35GHz",
+        default="3.2GHz",
         help="Big CPU clock frequency",
     )
     parser.add_argument(

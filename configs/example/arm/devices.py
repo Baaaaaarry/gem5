@@ -88,19 +88,65 @@ class L3(Cache):
     tgts_per_mshr = 16
     write_buffers = 32
     clusivity = "mostly_excl"
-    prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
+    # prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
+    prefetcher = AMPMPrefetcher(
+        on_miss=False, on_read=True, on_write=False, on_data=True, on_inst=False,
+        latency=6, queue_size=192, queue_filter=True, queue_squash=True,
+        cache_snoop=True, tag_prefetch=True,
+
+        ampm=AccessMapPatternMatching(
+            # 顺序流：起始度数适中，限制 stride 在可用范围（以 cacheline 为单位）
+            start_degree=24,
+            limit_stride=32,
+            hot_zone_size="16kB",
+            # 提升表容量与相联，增强学习覆盖
+            access_map_table_entries="2048",
+            access_map_table_assoc=16,
+            # 加快自适应节流（缩短 epoch）
+            epoch_cycles=50000,
+            high_coverage_threshold=0.60,
+            low_coverage_threshold=0.35,
+            high_accuracy_threshold=0.40,
+            low_accuracy_threshold=0.20,
+            high_cache_hit_threshold=0.95,
+            low_cache_hit_threshold=0.60,
+            # 抬高“可用带宽”估计，避免 degree 过早被压
+            offchip_memory_latency="100ns",
+        ),
+    )
 
 class SLC(Cache):
     assoc = 16
-    tag_latency = 1
-    data_latency = 1
+    tag_latency = 22
+    data_latency = 25
     response_latency = 1
     mshrs = 128
     tgts_per_mshr = 16
     write_buffers = 64
-    writeback_clean = True
+    writeback_clean = False
     clusivity = "mostly_incl"
-    prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
+    # prefetcher = StridePrefetcher(degree=32, latency=1, prefetch_on_access=True)
+    prefetcher = AMPMPrefetcher(
+        on_miss=False, on_read=True, on_write=False, on_data=True, on_inst=False,
+        latency=8, queue_size=192, queue_filter=True, queue_squash=True,
+        cache_snoop=True, tag_prefetch=True,
+
+        ampm=AccessMapPatternMatching(
+            start_degree=20,
+            limit_stride=32,
+            hot_zone_size="16kB",
+            access_map_table_entries="2048",
+            access_map_table_assoc=16,
+            epoch_cycles=60000,
+            high_coverage_threshold=0.60,
+            low_coverage_threshold=0.35,
+            high_accuracy_threshold=0.40,
+            low_accuracy_threshold=0.20,
+            high_cache_hit_threshold=0.95,
+            low_cache_hit_threshold=0.60,
+            offchip_memory_latency="100ns",
+        ),
+    )
 
 
 class MemBus(SystemXBar):
@@ -109,6 +155,8 @@ class MemBus(SystemXBar):
     snoop_filter = NULL
     width = 128
     response_latency = 3
+    frontend_latency = 7
+    forward_latency = 7
 
 
 class ArmCpuCluster(CpuCluster):

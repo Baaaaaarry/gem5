@@ -161,9 +161,24 @@ class O3_ARM_Cortex_x4_DCache(Cache):
     tgts_per_mshr = 16
     size = "64KiB"
     assoc = 4
-    write_buffers = 16
+    write_buffers = 32
     # Consider the L2 a victim cache also for clean lines
-    prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
+    # prefetcher = StridePrefetcher(degree=4, latency=1, prefetch_on_access=True)
+    prefetcher = StridePrefetcher(
+        on_miss=False, on_read=True, on_write=False, on_data=True, on_inst=False,
+        latency=1, queue_size=64, queue_filter=True, queue_squash=True,
+        cache_snoop=True, tag_prefetch=True,
+        use_virtual_addresses=True, prefetch_on_access=True,
+
+        table_assoc=4, table_entries="256",
+        table_indexing_policy=StridePrefetcherHashedSetAssociative(
+            entry_size=1, assoc=4, size="256"),
+        table_replacement_policy=RandomRP(),
+
+        degree=32,
+        # stable 中该参数若不存在，可删除；存在时建议 20~30
+        confidence_threshold=25,
+    )
     writeback_clean = True
 
 # L2 Cache
@@ -179,6 +194,18 @@ class O3_ARM_Cortex_x4L2(Cache):
     writeback_clean = True
     clusivity = "mostly_excl"
     # Simple stride prefetcher
-    prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
+    # prefetcher = StridePrefetcher(degree=8, latency=1, prefetch_on_access=True)
+    prefetcher = StridePrefetcher(
+        on_miss=False, on_read=True, on_write=False, on_data=True, on_inst=False,
+        latency=1, queue_size=96, queue_filter=True, queue_squash=True,
+        cache_snoop=True, tag_prefetch=True,
+
+        table_assoc=8, table_entries="1024",
+        table_indexing_policy=StridePrefetcherHashedSetAssociative(
+            entry_size=1, assoc=8, size="1024"),
+        table_replacement_policy=RandomRP(),
+
+        degree=32,
+    )
     tags = BaseSetAssoc()
     replacement_policy = LRURP()
