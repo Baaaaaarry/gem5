@@ -297,6 +297,52 @@ class ArmCpuClusterWithMonitor(ArmCpuCluster):
             for cpu in self.cpus:
                 cpu.connectCachedPorts(bus.cpu_side_ports, options = options)
 class L2PrivCluster(ArmCpuClusterWithMonitor):
+    def addL1(self, options=None):
+        for cpu in self.cpus:
+            l1i = None if self._l1i_type is None else self._l1i_type()
+            l1d = None if self._l1d_type is None else self._l1d_type()
+
+            if (
+                options
+                and getattr(options, "enable_gemmini", False)
+                and getattr(options, "gemmini_cpu", None) is cpu
+            ):
+                opt_cpu_monitor = getattr(options, "cpu_monitor", False)
+
+                cpu.icache = l1i
+                cpu.dcache = l1d
+
+                if hasattr(cpu, "connectMayWithMonitor"):
+                    cpu.connectMayWithMonitor(
+                        cpu,
+                        "self.icache_port",
+                        l1i.cpu_side,
+                        opt_cpu_monitor,
+                        name="iportmonitor",
+                    )
+                    cpu.connectMayWithMonitor(
+                        cpu,
+                        "self.dcache_port",
+                        options.gemmini_dev.cpu_side,
+                        opt_cpu_monitor,
+                        name="dportmonitor",
+                    )
+                else:
+                    cpu.icache_port = l1i.cpu_side
+                    cpu.dcache_port = options.gemmini_dev.cpu_side
+
+                options.gemmini_dev.mem_side = l1d.cpu_side
+
+                cpu._cached_ports = ["icache.mem_side", "dcache.mem_side"]
+                cpu._cached_ports += cpu.ArchMMU.walkerPorts()
+
+                if cpu.checker != NULL:
+                    cpu._cached_ports += [
+                        "checker." + port
+                        for port in cpu.ArchMMU.walkerPorts()
+                    ]
+            else:
+                cpu.addPrivateSplitL1Caches(l1i, l1d, options=options)
 
     def addL2(self, clk_domain, options = None):
         for cpu in self.cpus:
