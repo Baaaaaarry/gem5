@@ -212,9 +212,9 @@ if [ -n "$HOST_DIR" ]; then
     LOOP_DEV="$($SUDO losetup --find --show -P "$IMG_PATH")"
     PART="${LOOP_DEV}p1"
     if [ -b "$PART" ]; then
-        $SUDO mount "$PART" "$MOUNT_POINT"
+        $SUDO mount -o rw "$PART" "$MOUNT_POINT"
     else
-        $SUDO mount "$LOOP_DEV" "$MOUNT_POINT"
+        $SUDO mount -o rw "$LOOP_DEV" "$MOUNT_POINT"
     fi
     MOUNT_POINT_ACTIVE="$MOUNT_POINT"
     trap cleanup_mount EXIT
@@ -222,11 +222,14 @@ if [ -n "$HOST_DIR" ]; then
 fi
 
 if [ -n "$ROOTFS" ]; then
-    make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
+    if [ -z "$SUDO" ]; then
+        echo "warning: no sudo found; rootfs write may fail"
+    fi
+    $SUDO make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
         CROSS_COMPILE="$CROSS" INSTALL_MOD_PATH="$ROOTFS" modules_install
 
-    mkdir -p "$ROOTFS/root/gemmini"
-    cp -f "$DRIVER_DIR/gemmini_dev_a_drv.ko" "$ROOTFS/root/gemmini/"
+    $SUDO mkdir -p "$ROOTFS/root/gemmini"
+    $SUDO cp -f "$DRIVER_DIR/gemmini_dev_a_drv.ko" "$ROOTFS/root/gemmini/"
 fi
 
 if [ -n "$HOST_DIR" ]; then
