@@ -15,6 +15,7 @@ Usage: build_kernel_with_gemmini_ko.sh \
   [--config <file>] \
   [--kernel-url <url>] \
   [--kernel-tag <tag>] \
+  [--install-deps] \
   [--kernel-update] \
   [--kernel-remote <name>] \
   [--kernel-branch <name>]
@@ -33,6 +34,7 @@ Defaults:
   --kernel-src  <repo-root>/.tmp/linux-v4.18
   --kernel-out  <kernel-src>/build
   --driver-dir  <repo-root>/tests/test-progs/gemmini-apps/driver
+  --defconfig   defconfig
 
 Notes:
   - Ensure CONFIG_MODULES=y in the kernel .config.
@@ -58,6 +60,7 @@ KERNEL_REMOTE="origin"
 KERNEL_BRANCH=""
 KERNEL_URL="git@github.com:torvalds/linux.git"
 KERNEL_TAG="v4.18"
+INSTALL_DEPS="false"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -72,6 +75,7 @@ while [ $# -gt 0 ]; do
         --config) CONFIG_FILE="$2"; shift 2 ;;
         --kernel-url) KERNEL_URL="$2"; shift 2 ;;
         --kernel-tag) KERNEL_TAG="$2"; shift 2 ;;
+        --install-deps) INSTALL_DEPS="true"; shift ;;
         --kernel-update) KERNEL_UPDATE="true"; shift ;;
         --kernel-remote) KERNEL_REMOTE="$2"; shift 2 ;;
         --kernel-branch) KERNEL_BRANCH="$2"; shift 2 ;;
@@ -82,6 +86,10 @@ done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+if [ -z "$DEFCONFIG" ]; then
+    DEFCONFIG="defconfig"
+fi
 
 if [ -z "$KERNEL_SRC" ]; then
     KERNEL_SRC="${REPO_ROOT}/.tmp/linux-${KERNEL_TAG}"
@@ -101,6 +109,20 @@ if [ -n "$JOBS" ]; then
     MAKE_JOBS="-j$JOBS"
 else
     MAKE_JOBS="-j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
+fi
+
+if [ "$INSTALL_DEPS" = "true" ]; then
+    if command -v apt-get >/dev/null 2>&1; then
+        SUDO=""
+        if command -v sudo >/dev/null 2>&1; then
+            SUDO="sudo"
+        fi
+        $SUDO apt-get update
+        $SUDO apt-get install -y \
+            build-essential bc bison flex libssl-dev libelf-dev
+    else
+        echo "warning: --install-deps requested but apt-get not found"
+    fi
 fi
 
 if [ ! -d "$KERNEL_SRC" ]; then
@@ -126,16 +148,16 @@ if [ "$KERNEL_UPDATE" = "true" ]; then
     fi
 fi
 
-if [ -n "$DEFCONFIG" ]; then
-    make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
-        CROSS_COMPILE="$CROSS" "$DEFCONFIG"
-fi
-
 if [ -n "$CONFIG_FILE" ]; then
     mkdir -p "$KERNEL_OUT"
     cp "$CONFIG_FILE" "$KERNEL_OUT/.config"
     make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
         CROSS_COMPILE="$CROSS" olddefconfig
+else
+    if [ ! -f "$KERNEL_OUT/.config" ]; then
+        make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
+            CROSS_COMPILE="$CROSS" "$DEFCONFIG"
+    fi
 fi
 
 make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
