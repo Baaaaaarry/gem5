@@ -8,6 +8,10 @@ Usage: build_kernel_with_gemmini_ko.sh \
   [--kernel-out <path>] \
   [--driver-dir <path>] \
   [--rootfs <mount-point>] \
+  [--host-dir <path>] \
+  [--image-name <file>] \
+  [--kernel-dest <file>] \
+  [--mount-point <path>] \
   [--arch arm64] \
   [--cross aarch64-linux-gnu-] \
   [--jobs <n>] \
@@ -35,6 +39,9 @@ Defaults:
   --kernel-out  <kernel-src>/build
   --driver-dir  <repo-root>/tests/test-progs/gemmini-apps/driver
   --defconfig   defconfig
+  --image-name  ubuntu-18.04-arm64-docker.img
+  --kernel-dest vmlinux.arm64
+  --mount-point /mnt/gem5_rootfs
 
 Notes:
   - Ensure CONFIG_MODULES=y in the kernel .config.
@@ -43,6 +50,8 @@ Notes:
   - If --kernel-update is set, the script runs git fetch/pull in --kernel-src.
   - If --rootfs is set, modules are installed and the Gemmini .ko is copied
     into /root/gemmini inside the rootfs.
+  - If --host-dir is set, the script mounts the rootfs image, installs
+    modules and the .ko into it, replaces the kernel image, then unmounts.
 EOF
 }
 
@@ -50,6 +59,10 @@ KERNEL_SRC=""
 KERNEL_OUT=""
 DRIVER_DIR=""
 ROOTFS=""
+HOST_DIR=""
+IMAGE_NAME="ubuntu-18.04-arm64-docker.img"
+KERNEL_DEST="vmlinux.arm64"
+MOUNT_POINT="/mnt/gem5_rootfs"
 ARCH="arm64"
 CROSS="aarch64-linux-gnu-"
 JOBS=""
@@ -75,6 +88,10 @@ while [ $# -gt 0 ]; do
         --config) CONFIG_FILE="$2"; shift 2 ;;
         --kernel-url) KERNEL_URL="$2"; shift 2 ;;
         --kernel-tag) KERNEL_TAG="$2"; shift 2 ;;
+        --host-dir) HOST_DIR="$2"; shift 2 ;;
+        --image-name) IMAGE_NAME="$2"; shift 2 ;;
+        --kernel-dest) KERNEL_DEST="$2"; shift 2 ;;
+        --mount-point) MOUNT_POINT="$2"; shift 2 ;;
         --install-deps) INSTALL_DEPS="true"; shift ;;
         --kernel-update) KERNEL_UPDATE="true"; shift ;;
         --kernel-remote) KERNEL_REMOTE="$2"; shift 2 ;;
@@ -165,10 +182,61 @@ make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
 
 make -C "$DRIVER_DIR" KDIR="$KERNEL_OUT" ARCH="$ARCH" CROSS_COMPILE="$CROSS"
 
+SUDO=""
+if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+fi
+
+cleanup_mount() {
+    if [ -n "${MOUNT_POINT_ACTIVE:-}" ]; then
+        $SUDO umount "$MOUNT_POINT_ACTIVE" || true
+        MOUNT_POINT_ACTIVE=""
+    fi
+    if [ -n "${LOOP_DEV:-}" ]; then
+        $SUDO losetup -d "$LOOP_DEV" || true
+        LOOP_DEV=""
+    fi
+}
+
+if [ -n "$HOST_DIR" ]; then
+    IMG_PATH="${HOST_DIR}/${IMAGE_NAME}"
+    if [ ! -f "$IMG_PATH" ]; then
+        echo "error: rootfs image not found at $IMG_PATH"
+        exit 1
+    fi
+    if ! command -v losetup >/dev/null 2>&1; then
+        echo "error: losetup not found (host-dir mount requires Linux)"
+        exit 1
+    fi
+    mkdir -p "$MOUNT_POINT"
+    LOOP_DEV="$($SUDO losetup --find --show -P "$IMG_PATH")"
+    PART="${LOOP_DEV}p1"
+    if [ -b "$PART" ]; then
+        $SUDO mount "$PART" "$MOUNT_POINT"
+    else
+        $SUDO mount "$LOOP_DEV" "$MOUNT_POINT"
+    fi
+    MOUNT_POINT_ACTIVE="$MOUNT_POINT"
+    trap cleanup_mount EXIT
+    ROOTFS="$MOUNT_POINT_ACTIVE"
+fi
+
 if [ -n "$ROOTFS" ]; then
     make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
         CROSS_COMPILE="$CROSS" INSTALL_MOD_PATH="$ROOTFS" modules_install
 
     mkdir -p "$ROOTFS/root/gemmini"
     cp -f "$DRIVER_DIR/gemmini_dev_a_drv.ko" "$ROOTFS/root/gemmini/"
+fi
+
+if [ -n "$HOST_DIR" ]; then
+    KERNEL_SRC_PATH="$KERNEL_OUT/vmlinux"
+    if [ ! -f "$KERNEL_SRC_PATH" ]; then
+        KERNEL_SRC_PATH="$KERNEL_OUT/arch/arm64/boot/Image"
+    fi
+    if [ -f "$KERNEL_SRC_PATH" ]; then
+        cp -f "$KERNEL_SRC_PATH" "${HOST_DIR}/${KERNEL_DEST}"
+    else
+        echo "warning: kernel image not found in $KERNEL_OUT"
+    fi
 fi
