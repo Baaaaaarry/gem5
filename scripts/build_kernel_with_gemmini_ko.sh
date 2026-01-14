@@ -230,6 +230,10 @@ if [ -n "$ROOTFS" ]; then
 
     $SUDO mkdir -p "$ROOTFS/root/gemmini"
     $SUDO cp -f "$DRIVER_DIR/gemmini_dev_a_drv.ko" "$ROOTFS/root/gemmini/"
+    if [ -f "$DRIVER_DIR/gemmini_dev_a_user" ]; then
+        $SUDO cp -f "$DRIVER_DIR/gemmini_dev_a_user" "$ROOTFS/root/gemmini/"
+        $SUDO chmod 0755 "$ROOTFS/root/gemmini/gemmini_dev_a_user"
+    fi
 fi
 
 if [ -n "$HOST_DIR" ]; then

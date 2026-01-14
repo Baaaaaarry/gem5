@@ -3,7 +3,7 @@ obj-m += gemmini_dev_a_drv.o
 KDIR ?= /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 CC ?= gcc
-CFLAGS ?= -O2 -Wall -Wextra
+ccflags-y += -O2 -Wall -Wextra
 
 all: module user
 
