@@ -45,6 +45,7 @@ import m5
 import m5.util
 from m5.objects import *
 from m5.objects import Cache
+from m5.util.fdthelper import FdtNode, FdtPropertyStrings, FdtPropertyWords
 
 m5.util.addToPath("../../")
 
@@ -632,6 +633,30 @@ def build(options):
         )
         options.gemmini_dev = system.gemmini_dev
         options.gemmini_cpu = all_cpus[cpu_idx]
+
+        def _gemmini_generate_dt(orig_generate):
+            def _wrapped(state):
+                root = orig_generate(state)
+                node = FdtNode(
+                    f"gemmini@{int(options.gemmini_ctrl_addr):x}"
+                )
+                node.appendCompatible("gem5,gemmini-dev-a")
+                node.append(
+                    FdtPropertyWords(
+                        "reg",
+                        state.addrCells(options.gemmini_ctrl_addr)
+                        + state.sizeCells(options.gemmini_ctrl_size),
+                    )
+                )
+                node.append(FdtPropertyStrings("status", ["okay"]))
+                root.append(node)
+                return root
+
+            return _wrapped
+
+        system.generateDeviceTree = _gemmini_generate_dt(
+            system.generateDeviceTree
+        )
 
     # add L3 & SLC inside
     system.addCaches(options.caches, options.last_cache_level, options.l3_size, options.slc_size, options=options)

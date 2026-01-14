@@ -6,6 +6,7 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/overflow.h>
 #include <linux/platform_device.h>
@@ -27,11 +28,14 @@
 
 static unsigned long mmio_base = 0x40000000;
 static unsigned long mmio_size = 0x1000;
+static bool skip_claim = true;
 
 module_param(mmio_base, ulong, 0444);
 MODULE_PARM_DESC(mmio_base, "GemminiDevA MMIO base address");
 module_param(mmio_size, ulong, 0444);
 MODULE_PARM_DESC(mmio_size, "GemminiDevA MMIO size");
+module_param(skip_claim, bool, 0444);
+MODULE_PARM_DESC(skip_claim, "Skip request_mem_region when mapping MMIO");
 
 struct gemmini_dev_a_dev {
     struct device *dev;
@@ -292,10 +296,18 @@ static int gemmini_dev_a_probe(struct platform_device *pdev)
     if (!gdev)
         return -ENOMEM;
 
-    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-    gdev->regs = devm_ioremap_resource(&pdev->dev, res);
-    if (IS_ERR(gdev->regs))
-        return PTR_ERR(gdev->regs);
+    if (skip_claim) {
+        if (!mmio_size)
+            return -EINVAL;
+        gdev->regs = devm_ioremap(&pdev->dev, mmio_base, mmio_size);
+        if (!gdev->regs)
+            return -ENOMEM;
+    } else {
+        res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+        gdev->regs = devm_ioremap_resource(&pdev->dev, res);
+        if (IS_ERR(gdev->regs))
+            return PTR_ERR(gdev->regs);
+    }
 
     gdev->dev = &pdev->dev;
     mutex_init(&gdev->lock);
@@ -328,20 +340,33 @@ static int gemmini_dev_a_remove(struct platform_device *pdev)
     return 0;
 }
 
+static const struct of_device_id gemmini_dev_a_of_match[] = {
+    { .compatible = "gem5,gemmini-dev-a" },
+    { },
+};
+MODULE_DEVICE_TABLE(of, gemmini_dev_a_of_match);
+
 static struct platform_driver gemmini_dev_a_driver = {
     .probe = gemmini_dev_a_probe,
     .remove = gemmini_dev_a_remove,
     .driver = {
         .name = "gemmini-dev-a",
+        .of_match_table = of_match_ptr(gemmini_dev_a_of_match),
     },
 };
 
 static struct platform_device *gemmini_pdev;
+static bool using_dt;
 
 static int __init gemmini_dev_a_init(void)
 {
     struct resource res;
     int ret;
+
+    if (of_find_compatible_node(NULL, NULL, "gem5,gemmini-dev-a")) {
+        using_dt = true;
+        return platform_driver_register(&gemmini_dev_a_driver);
+    }
 
     if (!mmio_size)
         return -EINVAL;
@@ -367,7 +392,8 @@ static int __init gemmini_dev_a_init(void)
 static void __exit gemmini_dev_a_exit(void)
 {
     platform_driver_unregister(&gemmini_dev_a_driver);
-    platform_device_unregister(gemmini_pdev);
+    if (!using_dt && gemmini_pdev)
+        platform_device_unregister(gemmini_pdev);
 }
 
 module_init(gemmini_dev_a_init);
