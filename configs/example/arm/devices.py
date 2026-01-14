@@ -658,7 +658,7 @@ class BaseSimpleSystem(ArmSystem, ClusterSystem):
         if hasattr(self.realview.gic, "cpu_addr"):
             self.gic_cpu_addr = self.realview.gic.cpu_addr
 
-        self.terminal = Terminal()
+        self.terminal = Terminal(port=4567)
         self.vncserver = VncServer()
 
         self.iobus = IOXBar()

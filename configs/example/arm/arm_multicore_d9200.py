@@ -456,6 +456,76 @@ def addOptions(parser):
         default=False,
         help="add mem monitor to out port of slc"
     )
+    
+    # NPU integration (stub model)
+    parser.add_argument(
+        "--enable-npu",
+        action="store_true",
+        default=False,
+        help="Instantiate a simple stub NPU device"
+    )
+    parser.add_argument(
+        "--npu-pio-addr",
+        type=lambda v: int(v, 0),
+        default=0x1D000000,
+        help="MMIO base address for the NPU device (default: 0x1D000000)"
+    )
+    parser.add_argument(
+        "--npu-pio-size",
+        type=lambda v: int(v, 0),
+        default=0x1000,
+        help="MMIO size for the NPU device (default: 0x1000)"
+    )
+
+    # Gemmini/NDP integration
+    parser.add_argument(
+        "--enable-gemmini",
+        action="store_true",
+        default=False,
+        help="Instantiate a GemminiDevA accelerator using the NDP model"
+    )
+    parser.add_argument(
+        "--gemmini-ctrl-addr",
+        type=lambda v: int(v, 0),
+        default=0x40000000,
+        help="GemminiDevA MMIO base address (default: 0x40000000)"
+    )
+    parser.add_argument(
+        "--gemmini-ctrl-size",
+        type=lambda v: int(v, 0),
+        default=0x1000,
+        help="GemminiDevA MMIO size (default: 0x1000)"
+    )
+    parser.add_argument(
+        "--gemmini-data-addr",
+        type=lambda v: int(v, 0),
+        default=0x40001000,
+        help="GemminiDevA shared data region base (default: 0x40001000)"
+    )
+    parser.add_argument(
+        "--gemmini-data-size",
+        type=lambda v: int(v, 0),
+        default=0x3FFFF000,
+        help="GemminiDevA shared data region size (default: 0x3FFFF000)"
+    )
+    parser.add_argument(
+        "--gemmini-max-rsze",
+        type=lambda v: int(v, 0),
+        default=0x40,
+        help="GemminiDevA max request size (default: 0x40)"
+    )
+    parser.add_argument(
+        "--gemmini-max-reqs",
+        type=int,
+        default=64,
+        help="GemminiDevA max outstanding requests (default: 64)"
+    )
+    parser.add_argument(
+        "--gemmini-cpu-idx",
+        type=int,
+        default=0,
+        help="Index in the flattened CPU list to attach GemminiDevA (default: 0)"
+    )
     return parser
 
 
@@ -538,6 +608,34 @@ def build(options):
         != system.littleCluster.memory_mode()
     ):
         m5.util.panic("Memory mode missmatch among CPU clusters")
+        
+    if getattr(options, "enable_gemmini", False):
+        from m5.objects import GemminiDevA
+
+        if not all_cpus:
+            m5.util.panic("GemminiDevA requested but no CPUs were created.")
+
+        cpu_idx = options.gemmini_cpu_idx
+        if cpu_idx < 0 or cpu_idx >= len(all_cpus):
+            m5.util.panic(
+                f"Invalid --gemmini-cpu-idx={cpu_idx}; "
+                f"valid range is 0..{len(all_cpus) - 1}"
+            )
+
+        system.gemmini_dev = GemminiDevA(
+            ndp_ctrl=(
+                options.gemmini_ctrl_addr,
+                options.gemmini_ctrl_addr + options.gemmini_ctrl_size,
+            ),
+            ndp_data=(
+                options.gemmini_data_addr,
+                options.gemmini_data_addr + options.gemmini_data_size,
+            ),
+            max_rsze=options.gemmini_max_rsze,
+            max_reqs=options.gemmini_max_reqs,
+        )
+        options.gemmini_dev = system.gemmini_dev
+        options.gemmini_cpu = all_cpus[cpu_idx]
 
     # add L3 & SLC inside
     system.addCaches(options.caches, options.last_cache_level, options.l3_size, options.slc_size, options=options)
@@ -554,6 +652,34 @@ def build(options):
             m5.options.outdir, "system.dtb"
         )
         system.generateDtb(system.workload.dtb_filename)
+    # Optionally instantiate a simple NPU stub device.
+    # The NPU is modeled as a generic DMA-capable MMIO device hanging off
+    # the IO bus. Its internal behavior is intentionally minimal.
+    if getattr(options, "enable_npu", False):
+        # Import here to avoid hard dependency if the object is not built.
+        from m5.objects import NPUDevice
+
+        system.npu = NPUDevice(
+            pioAddr=options.npu_pio_addr,
+            pioSize=options.npu_pio_size,
+        )
+        # Attach MMIO port to the IO bus, similar to other devices.
+        system.npu.pio = system.iobus.mem_side_ports
+        # For DMA, prefer to connect the NPU behind the last-level caches
+        # so that accesses flow through the same SLC/DDR path as the CPUs.
+        if hasattr(system, "toSLCBus"):
+            # CPU clusters connect to L3 -> toSLCBus -> SLC -> membus -> DDR.
+            # Make the NPU another master on the SLC-side coherent bus.
+            system.npu.dma = system.toSLCBus.cpu_side_ports
+        else:
+            # Fallback: connect directly to the main memory bus.
+            system.npu.dma = system.membus.cpu_side_ports
+
+    if getattr(options, "enable_gemmini", False):
+        if hasattr(system, "toSLCBus"):
+            system.gemmini_dev.dma_port = system.toSLCBus.cpu_side_ports
+        else:
+            system.gemmini_dev.dma_port = system.membus.cpu_side_ports
 
     if devices.have_fastmodel and issubclass(big_model, FastmodelCluster):
         from m5 import arm_fast_model as fm
