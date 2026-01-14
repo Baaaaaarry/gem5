@@ -1,29 +1,18 @@
 #!/bin/sh
 
-mkdir -p /proc /sys /tmp /mnt/host
+mkdir -p /proc /sys /tmp
 mount -t proc proc /proc 2>/dev/null || true
 mount -t sysfs sysfs /sys 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp 2>/dev/null || true
-
-# Mount host share via 9p (requires --vio-9p + kernel 9p support)
-if grep -q 9p /proc/filesystems; then
-    if command -v modprobe >/dev/null 2>&1; then
-        modprobe 9pnet_virtio 2>/dev/null || true
-        modprobe 9p 2>/dev/null || true
-    fi
-    mount -t 9p -o trans=virtio,version=9p2000.L gem5 /mnt/host || true
-else
-    echo "9p filesystem not supported by kernel; skip host mount"
-fi
 
 INSMOD=/sbin/insmod
 if ! command -v "$INSMOD" >/dev/null 2>&1; then
     INSMOD=insmod
 fi
 
-if [ -x /mnt/host/gemmini_dev_a_user ] && command -v "$INSMOD" >/dev/null 2>&1; then
-    "$INSMOD" /mnt/host/gemmini_dev_a_drv.ko mmio_base=0x40000000 mmio_size=0x1000
-    /mnt/host/gemmini_dev_a_user 2
+if [ -x /root/gemmini/gemmini_dev_a_user ] && command -v "$INSMOD" >/dev/null 2>&1; then
+    "$INSMOD" /root/gemmini/gemmini_dev_a_drv.ko mmio_base=0x40000000 mmio_size=0x1000
+    /root/gemmini/gemmini_dev_a_user 2
 else
     echo "Gemmini driver/app not available (check 9p mount and kmod tools)"
 fi
