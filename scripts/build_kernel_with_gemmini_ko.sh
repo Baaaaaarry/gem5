@@ -20,6 +20,7 @@ Usage: build_kernel_with_gemmini_ko.sh \
   [--kernel-url <url>] \
   [--kernel-tag <tag>] \
   [--install-deps] \
+  [--build-user] \
   [--kernel-update] \
   [--kernel-remote <name>] \
   [--kernel-branch <name>]
@@ -42,6 +43,7 @@ Defaults:
   --image-name  ubuntu-18.04-arm64-docker.img
   --kernel-dest vmlinux.arm64
   --mount-point /mnt/gem5_rootfs
+  --build-user  enabled
 
 Notes:
   - Ensure CONFIG_MODULES=y in the kernel .config.
@@ -74,6 +76,7 @@ KERNEL_BRANCH=""
 KERNEL_URL="git@github.com:torvalds/linux.git"
 KERNEL_TAG="v4.18"
 INSTALL_DEPS="false"
+BUILD_USER="true"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -93,6 +96,7 @@ while [ $# -gt 0 ]; do
         --kernel-dest) KERNEL_DEST="$2"; shift 2 ;;
         --mount-point) MOUNT_POINT="$2"; shift 2 ;;
         --install-deps) INSTALL_DEPS="true"; shift ;;
+        --build-user) BUILD_USER="true"; shift ;;
         --kernel-update) KERNEL_UPDATE="true"; shift ;;
         --kernel-remote) KERNEL_REMOTE="$2"; shift 2 ;;
         --kernel-branch) KERNEL_BRANCH="$2"; shift 2 ;;
@@ -136,7 +140,7 @@ if [ "$INSTALL_DEPS" = "true" ]; then
         fi
         $SUDO apt-get update
         $SUDO apt-get install -y \
-            build-essential bc bison flex libssl-dev libelf-dev
+            build-essential bc bison flex libssl-dev libelf-dev gcc-aarch64-linux-gnu
     else
         echo "warning: --install-deps requested but apt-get not found"
     fi
@@ -181,6 +185,16 @@ make -C "$KERNEL_SRC" O="$KERNEL_OUT" ARCH="$ARCH" \
     CROSS_COMPILE="$CROSS" $MAKE_JOBS Image modules dtbs
 
 make -C "$DRIVER_DIR" KDIR="$KERNEL_OUT" ARCH="$ARCH" CROSS_COMPILE="$CROSS"
+
+if [ "$BUILD_USER" = "true" ]; then
+    if command -v "${CROSS}gcc" >/dev/null 2>&1; then
+        "${CROSS}gcc" -O2 -Wall -Wextra -o \
+            "$DRIVER_DIR/gemmini_dev_a_user" \
+            "$DRIVER_DIR/gemmini_dev_a_user.c"
+    else
+        echo "warning: ${CROSS}gcc not found; skipping user app build"
+    fi
+fi
 
 SUDO=""
 if command -v sudo >/dev/null 2>&1; then
