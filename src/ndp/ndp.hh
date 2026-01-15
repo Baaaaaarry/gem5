@@ -128,7 +128,8 @@ namespace gem5
 
 		CPUSidePort cpuPort;
 		MemSidePort memPort, dmaPort;
-		AddrRange ndpCtrl, ndpData;
+        AddrRange ndpCtrl, ndpData;
+        bool mmioOnly;
 		bool dmaActv;
 		uint64_t maxRSze, maxReqs, flyReqs;
 		std::list<BurstRequest *> pendingRequests;

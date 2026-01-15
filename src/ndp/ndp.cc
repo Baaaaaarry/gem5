@@ -10,6 +10,7 @@ namespace gem5
 	dmaPort(params.name + ".dma_port", this),
 	ndpCtrl(params.ndp_ctrl),
 	ndpData(params.ndp_data),
+	mmioOnly(params.mmio_only),
 	maxRSze(params.max_rsze),
 	maxReqs(params.max_reqs)
 	{
@@ -327,6 +328,11 @@ namespace gem5
 	AddrRangeList
 	NDP::getAddrRanges() const
 	{	
+		if (mmioOnly) {
+			AddrRangeList ranges;
+			ranges.push_back(ndpCtrl);
+			return ranges;
+		}
 		return memPort.getAddrRanges();
 	}
 

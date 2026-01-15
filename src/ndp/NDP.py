@@ -15,5 +15,6 @@ class NDP(ClockedObject):
     ndp_data = Param.AddrRange(('0x40001000', '0x80000000'), "Memory Range shared between the NDP device and the CPU")
     max_rsze = Param.Unsigned(0x800, "Maximum request size to memory")
     max_reqs = Param.Unsigned(1, "Number of clock cycles between requests to prevent the overflow of the packet queue")
+    mmio_only = Param.Bool(False, "Expose only ndp_ctrl range for MMIO buses")
 
     system = Param.System(Parent.any, "The system this NDP device is part of")

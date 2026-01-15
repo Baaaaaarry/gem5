@@ -481,6 +481,12 @@ def addOptions(parser):
         help="Instantiate a GemminiDevA accelerator using the NDP model"
     )
     parser.add_argument(
+        "--gemmini-mmio-iobus",
+        action="store_true",
+        default=False,
+        help="Attach GemminiDevA as an MMIO device on the IO bus"
+    )
+    parser.add_argument(
         "--gemmini-ctrl-addr",
         type=lambda v: int(v, 0),
         default=0x40000000,
@@ -629,6 +635,7 @@ def build(options):
             ),
             max_rsze=options.gemmini_max_rsze,
             max_reqs=options.gemmini_max_reqs,
+            mmio_only=options.gemmini_mmio_iobus,
         )
         options.gemmini_dev = system.gemmini_dev
         options.gemmini_cpu = all_cpus[cpu_idx]
@@ -674,6 +681,12 @@ def build(options):
             system.npu.dma = system.membus.cpu_side_ports
 
     if getattr(options, "enable_gemmini", False):
+        if getattr(options, "gemmini_mmio_iobus", False):
+            system.gemmini_dev.cpu_side = system.iobus.mem_side_ports
+            if hasattr(system, "toSLCBus"):
+                system.gemmini_dev.mem_side = system.toSLCBus.cpu_side_ports
+            else:
+                system.gemmini_dev.mem_side = system.membus.cpu_side_ports
         if hasattr(system, "toSLCBus"):
             system.gemmini_dev.dma_port = system.toSLCBus.cpu_side_ports
         else:
