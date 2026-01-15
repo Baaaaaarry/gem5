@@ -306,6 +306,7 @@ class L2PrivCluster(ArmCpuClusterWithMonitor):
                 options
                 and getattr(options, "enable_gemmini", False)
                 and getattr(options, "gemmini_cpu", None) is cpu
+                and not getattr(options, "gemmini_mmio_iobus", False)
             ):
                 opt_cpu_monitor = getattr(options, "cpu_monitor", False)
 
