@@ -11,7 +11,7 @@ if ! command -v "$INSMOD" >/dev/null 2>&1; then
 fi
 
 if [ -x /root/gemmini/gemmini_dev_a_user ] && command -v "$INSMOD" >/dev/null 2>&1; then
-    "$INSMOD" /root/gemmini/gemmini_dev_a_drv.ko mmio_base=0x40000000 mmio_size=0x1000
+    "$INSMOD" /root/gemmini/gemmini_dev_a_drv.ko
     /root/gemmini/gemmini_dev_a_user 2
 else
     echo "Gemmini driver/app not available (check 9p mount and kmod tools)"
